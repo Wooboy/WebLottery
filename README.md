@@ -1,42 +1,76 @@
-# lottory
+# 網頁抽獎系統
 
-This template should help get you started developing with Vue 3 in Vite.
+這是一個基於 **Vue 3** 開發的純前端抽獎應用程式。具備高度自定義的獎項設定、流暢的抽獎動畫、以及完整的資料持久化功能，適合各類年會、春酒或活動場合使用。
 
-## Recommended IDE Setup
+## 🚀 核心特色
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- **純前端運作**：無需後端資料庫，所有資料皆儲存在瀏覽器的 `LocalStorage`，重新整理頁面不丟失進度。
+- **靈活抽獎模式**：
+  - **連續單抽**：啟動亂數跳動後，每按一次空白鍵抽出一位中獎者，動畫持續進行不中斷，直到獎項抽滿為止。
+  - **一次抽完**：按下空白鍵後直接揭曉該獎項剩餘的所有名額。
+- **全局排除機制**：系統會自動記錄所有中獎者，並在後續的任何獎項抽獎中自動排除，確保不重複中獎。
+- **視覺美化設計**：
+  - **玻璃擬態 (Glassmorphism)**：現代感透明模糊介面。
+  - **五大色系切換**：提供「紅、黑、藍、綠、黃」漸層背景風格。
+  - **隱藏式導覽選單**：收折於底部，最大化抽獎畫面的視覺衝擊力。
+- **資料匯入/匯出**：
+  - 支援 **CSV 批次匯入獎項**（包含名稱、獎品、數量、背景圖）。
+  - 提供 **CSV 中獎名單匯出**（包含 Timestamp 隨機種子存證）。
 
-## Recommended Browser Setup
+---
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+## 📂 檔案架構
 
-## Type Support for `.vue` Imports in TS
+請確保以下三個檔案放置於同一個資料夾中：
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
-npm install
+```text
+/
+├── index.html   # 頁面結構與 Vue 模板
+├── style.css    # 自定義視覺樣式與動畫
+└── app.js       # 核心抽獎邏輯與狀態管理
 ```
 
-### Compile and Hot-Reload for Development
+---
 
-```sh
-npm run dev
-```
+## 🛠️ 安裝與使用
 
-### Type-Check, Compile and Minify for Production
+1. **直接執行**：本專案使用 CDN 載入 Vue 3 與 Tailwind CSS，請確保電腦連接網路，直接以瀏覽器開啟 `index.html` 即可運作。
+2. **名單輸入**：
+   - 前往 **Setting 設定** 頁面。
+   - 在左側「參與名單」區域貼上名單（每行一位姓名）。
+3. **設定獎項**：
+   - 手動在表格中新增獎項，或準備一個 CSV 檔案進行匯入。
+   - 獎項數量 > 1 時，可選擇「連續單抽」或「一次抽完」模式。
+4. **開始抽獎**：
+   - 切換至 **Lottery 抽獎** 頁面。
+   - 使用畫面上方的 **❮ / ❯** 按鈕切換要抽的獎項。
+   - 按下 **[ 空白鍵 Space ]** 啟動/揭曉。
+5. **匯出結果**：
+   - 前往 **Results 結果** 頁面。
+   - 點擊「匯出 CSV 名單」儲存中獎紀錄。
 
-```sh
-npm run build
-```
+---
+
+## 📝 匯入獎項 CSV 範例格式
+
+匯入的 CSV 檔案首行為標題列，內容格式如下：
+
+| 名稱   | 獎品        | 數量 | 背景圖片連結                      |
+| :----- | :---------- | :--- | :-------------------------------- |
+| 特等獎 | MacBook Pro | 1    | https://example.com/gold-bg.jpg   |
+| 二等獎 | iPhone 15   | 5    | https://example.com/silver-bg.jpg |
+
+---
+
+## ⚙️ 技術說明
+
+- **亂數演算法**：使用按下空白鍵時的毫秒級時間戳 (`Date.now()`) 作為隨機種子。
+- **狀態管理**：使用 Vue 3 的 `reactive` 與 `computed` 處理繁雜的名單排除與剩餘數量計算。
+- **佈局技術**：使用 CSS Flexbox 與 `clamp()` 響應式字體，確保抽獎大字在各種螢幕尺寸都能完美呈現。
+
+---
+
+## ⚠️ 注意事項
+
+- **清除緩存**：若要完全清空所有紀錄，請使用設定頁面底部的「🚨 重設系統資料」按鈕。
+- **瀏覽器相容性**：建議使用最新版 Chrome、Edge 或 Safari 以獲得最佳動畫效果。

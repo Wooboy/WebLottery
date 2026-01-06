@@ -8,51 +8,56 @@ const app = createApp({
     const spinningName = ref('')
     let spinTimer = null
 
-    // 色系配置
+    // 色系主題對照表
     const themeClasses = {
-      red: { grad: 'from-red-950 via-red-800 to-red-700', btn: 'bg-red-600' },
-      black: { grad: 'from-black via-zinc-950 to-zinc-900', btn: 'bg-zinc-800' },
-      blue: { grad: 'from-blue-950 via-blue-800 to-blue-700', btn: 'bg-blue-600' },
-      green: { grad: 'from-emerald-950 via-emerald-800 to-emerald-700', btn: 'bg-emerald-600' },
-      yellow: { grad: 'from-amber-950 via-amber-700 to-amber-600', btn: 'bg-amber-500' },
+      red: { grad: 'from-red-950 via-red-900 to-red-800', btn: 'bg-red-600' },
+      black: { grad: 'from-zinc-950 via-zinc-900 to-black', btn: 'bg-zinc-800' },
+      blue: { grad: 'from-blue-950 via-blue-900 to-blue-800', btn: 'bg-blue-600' },
+      green: { grad: 'from-emerald-950 via-emerald-900 to-emerald-800', btn: 'bg-emerald-600' },
+      yellow: { grad: 'from-amber-950 via-amber-900 to-amber-700', btn: 'bg-amber-500' },
     }
 
-    // 核心狀態
-    const state = reactive({
+    // 預設資料結構
+    const defaultState = {
       rawParticipants: '',
-      prizes: [{ name: '壹等獎', reward: '神秘大禮', count: 1, mode: 'single', bgUrl: '' }],
+      prizes: [{ name: '壹等獎', reward: '神秘獎品', count: 1, mode: 'single', bgUrl: '' }],
       results: [],
       config: { theme: 'red' },
       currentIndex: 0,
-    })
+    }
 
-    // 1. 初始化與儲存邏輯
+    const state = reactive({ ...defaultState })
+
+    // --- 核心邏輯：資料初始化 ---
     onMounted(() => {
-      const saved = localStorage.getItem('lottery_v2_final_storage')
+      const saved = localStorage.getItem('lottery_app_v2026_data')
       if (saved) {
         try {
-          Object.assign(state, JSON.parse(saved))
+          const parsed = JSON.parse(saved)
+          Object.assign(state, parsed)
         } catch (e) {
-          console.error('Data error', e)
+          console.error('解析存檔失敗:', e)
         }
       }
+      // 監聽鍵盤空白鍵
       window.addEventListener('keydown', handleKeydown)
     })
 
+    // 監聽狀態改變並儲存
     watch(
       state,
-      (v) => {
-        localStorage.setItem('lottery_v2_final_storage', JSON.stringify(v))
+      (newVal) => {
+        localStorage.setItem('lottery_app_v2026_data', JSON.stringify(newVal))
       },
       { deep: true },
     )
 
-    // 2. 計算屬性 (View 依賴)
+    // --- 計算屬性 ---
     const participantsAll = computed(() =>
       state.rawParticipants
         .split('\n')
         .map((s) => s.trim())
-        .filter((s) => s),
+        .filter((s) => s !== ''),
     )
 
     const availablePool = computed(() => {
@@ -60,32 +65,35 @@ const app = createApp({
       return participantsAll.value.filter((p) => !winners.includes(p))
     })
 
-    const activePrize = computed(() => state.prizes[state.currentIndex])
+    const activePrize = computed(() => state.prizes[state.currentIndex] || null)
 
     const currentWinners = computed(() => {
       if (!activePrize.value) return []
       return state.results.filter((r) => r.prizeName === activePrize.value.name)
     })
 
-    function remainingCount(name) {
-      const p = state.prizes.find((i) => i.name === name)
-      const won = state.results.filter((r) => r.prizeName === name).length
-      return p ? p.count - won : 0
+    function remainingCount(prizeName) {
+      const p = state.prizes.find((i) => i.name === prizeName)
+      const won = state.results.filter((r) => r.prizeName === prizeName).length
+      return p ? Math.max(0, p.count - won) : 0
     }
 
-    // 3. 抽獎核心邏輯
+    // --- 抽獎動作 ---
     function handleKeydown(e) {
+      // 禁止在輸入框按空白鍵時觸發抽獎
+      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return
+
       if (e.code === 'Space' && currentView.value === 'lottery' && activePrize.value) {
         e.preventDefault()
         if (isSpinning.value) {
-          // 若是連續單抽且名額超過1人，按空白鍵記錄但不停止動畫
+          // 若是連續單抽模式且還有下位，則「記錄但不停止」
           const isSingleMode = activePrize.value.mode === 'single'
-          const hasMore = remainingCount(activePrize.value.name) > 1
+          const hasMoreThanOne = remainingCount(activePrize.value.name) > 1
 
-          if (isSingleMode && hasMore) {
-            recordWinner(false) // 記錄一人，不停動畫
+          if (isSingleMode && hasMoreThanOne) {
+            performDrawRecord(false) // 記錄一人，動畫繼續
           } else {
-            recordWinner(true) // 最後一人或「一次抽完」，停下
+            performDrawRecord(true) // 最後一位或一次抽完模式，停止
           }
         } else {
           startSpinning()
@@ -94,42 +102,51 @@ const app = createApp({
     }
 
     function startSpinning() {
-      if (remainingCount(activePrize.value.name) <= 0) return alert('名額已抽完')
-      if (availablePool.value.length === 0) return alert('名單內已無待抽人員')
+      if (remainingCount(activePrize.value.name) <= 0) return alert('此獎項名額已滿！')
+      if (availablePool.value.length === 0) return alert('可用人員名單已空！')
+
       isSpinning.value = true
       spinTimer = setInterval(() => {
         const pool = availablePool.value
         spinningName.value = pool[Math.floor(Math.random() * pool.length)]
-      }, 50)
+      }, 60)
     }
 
-    function recordWinner(shouldStop) {
+    function performDrawRecord(stopAnimation) {
       const timestamp = Date.now()
       const pool = [...availablePool.value]
 
       if (activePrize.value.mode === 'all') {
-        // 一次抽完模式
-        const countToDraw = Math.min(remainingCount(activePrize.value.name), pool.length)
-        for (let i = 0; i < countToDraw; i++) {
+        // 一次性抽完所有名額
+        const toDraw = Math.min(remainingCount(activePrize.value.name), pool.length)
+        for (let i = 0; i < toDraw; i++) {
           const idx = (timestamp + i) % pool.length
           const winner = pool.splice(idx, 1)[0]
           state.results.push({ prizeName: activePrize.value.name, winner, seed: timestamp + i })
         }
-        spinningName.value = state.results[state.results.length - 1].winner
+        // 最後一位名字留在畫面上
+        if (state.results.length > 0) {
+          spinningName.value = state.results[state.results.length - 1].winner
+        }
         clearInterval(spinTimer)
         isSpinning.value = false
       } else {
         // 單抽模式
         const winner = spinningName.value
-        state.results.push({ prizeName: activePrize.value.name, winner, seed: timestamp })
-        if (shouldStop) {
+        state.results.push({
+          prizeName: activePrize.value.name,
+          winner: winner,
+          seed: timestamp,
+        })
+
+        if (stopAnimation) {
           clearInterval(spinTimer)
           isSpinning.value = false
         }
       }
     }
 
-    // 4. 其他功能
+    // --- 選單功能 ---
     function changeTab(id) {
       currentView.value = id
       isNavExpanded.value = false
@@ -138,16 +155,16 @@ const app = createApp({
     function prevPrize() {
       if (isSpinning.value) return
       state.currentIndex = (state.currentIndex - 1 + state.prizes.length) % state.prizes.length
-      resetDisplay()
+      resetPrizeView()
     }
 
     function nextPrize() {
       if (isSpinning.value) return
       state.currentIndex = (state.currentIndex + 1) % state.prizes.length
-      resetDisplay()
+      resetPrizeView()
     }
 
-    function resetDisplay() {
+    function resetPrizeView() {
       spinningName.value =
         currentWinners.value.length > 0
           ? currentWinners.value[currentWinners.value.length - 1].winner
@@ -159,24 +176,27 @@ const app = createApp({
       const reader = new FileReader()
       reader.onload = (ev) => {
         const lines = ev.target.result.split(/\r?\n/).filter((l) => l.trim())
-        state.prizes = lines.slice(1).map((l) => {
-          const [name, reward, count, bgUrl] = l.split(',').map((s) => s.trim())
-          return { name, reward, count: parseInt(count) || 1, mode: 'single', bgUrl: bgUrl || '' }
-        })
-        state.currentIndex = 0
+        if (lines.length > 1) {
+          state.prizes = lines.slice(1).map((l) => {
+            const [name, reward, count, bgUrl] = l.split(',').map((s) => s.trim())
+            return { name, reward, count: parseInt(count) || 1, mode: 'single', bgUrl: bgUrl || '' }
+          })
+          state.currentIndex = 0
+          alert('匯入獎項成功！')
+        }
       }
       reader.readAsText(file)
     }
 
     function confirmRedraw() {
-      if (confirm('確定作廢此獎項目前的紀錄並重新抽獎？')) {
+      if (confirm('警告：這將清除此獎項目前的「所有」中獎紀錄並讓名額回流，確定嗎？')) {
         state.results = state.results.filter((r) => r.prizeName !== activePrize.value.name)
         spinningName.value = ''
       }
     }
 
     function resetSystem() {
-      if (confirm('警告：這將徹底清除所有數據！')) {
+      if (confirm('🚨 確定要刪除所有資料（名單、紀錄、設定）嗎？這將無法復原！')) {
         localStorage.clear()
         location.reload()
       }
@@ -187,8 +207,12 @@ const app = createApp({
     }
 
     function exportCSV() {
-      let content = '\ufeff獎項,得獎人,Timestamp Seed\n'
-      state.results.forEach((r) => (content += `${r.prizeName},${r.winner},${r.seed}\n`))
+      if (state.results.length === 0) return alert('目前尚無紀錄可匯出')
+      let content = '\ufeff獎項名稱,獎品內容,中獎人員,亂數種子(Timestamp)\n'
+      state.results.forEach((r) => {
+        const prize = state.prizes.find((p) => p.name === r.prizeName)
+        content += `${r.prizeName},${prize?.reward || ''},${r.winner},${r.seed}\n`
+      })
       const a = document.createElement('a')
       a.href = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8;' }))
       a.download = `中獎清單_${new Date().getTime()}.csv`
