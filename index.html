@@ -3,35 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>專業網頁抽獎系統 - 連續抽獎優化版</title>
+    <title>專業抽獎系統 V2.0</title>
+    <!-- 引入 Vue 3 與 Tailwind CSS -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       [v-cloak] {
         display: none;
       }
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background-color: #000;
+      }
+
+      /* 玻璃擬態卡片 */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(15px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      /* 滾動條美化 */
       ::-webkit-scrollbar {
-        width: 4px;
+        width: 5px;
       }
       ::-webkit-scrollbar-thumb {
         background: rgba(255, 255, 255, 0.2);
         border-radius: 10px;
       }
 
-      .glass-card {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-      }
-
-      .text-glow {
-        text-shadow:
-          0 0 15px rgba(255, 255, 255, 0.6),
-          0 0 30px rgba(255, 255, 255, 0.2);
-      }
-
-      .nav-container {
+      /* 底部選單動畫 */
+      .nav-drawer {
         position: fixed;
         bottom: 0;
         left: 50%;
@@ -41,128 +47,133 @@
         z-index: 1000;
         transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       }
-      .nav-container.expanded {
+      .nav-drawer.active {
         transform: translateX(-50%) translateY(-20px);
       }
 
-      /* 中獎者標籤動畫 */
-      .winner-enter-active {
-        transition: all 0.4s ease-out;
+      /* 大標題文字發光 */
+      .glow-text {
+        text-shadow:
+          0 0 20px rgba(255, 255, 255, 0.5),
+          0 0 10px rgba(255, 255, 255, 0.3);
       }
-      .winner-enter-from {
+
+      /* 中獎標籤動畫 */
+      .list-enter-active,
+      .list-leave-active {
+        transition: all 0.4s ease;
+      }
+      .list-enter-from {
         opacity: 0;
-        transform: scale(0.5) translateY(-20px);
-      }
-
-      .page-content {
-        height: 100vh;
-        overflow-y: auto;
-      }
-
-      /* 抽獎主視窗佈局 */
-      .lottery-main {
-        height: calc(100vh - 80px);
-        display: flex;
-        flex-direction: column;
+        transform: scale(0.5);
       }
     </style>
   </head>
-  <body class="bg-zinc-950 text-white overflow-hidden">
+  <body>
     <div id="app" v-cloak>
-      <!-- 主背景與色系切換 -->
+      <!-- 主背景容器 -->
       <div
-        :class="['relative h-screen w-full transition-all duration-1000 bg-gradient-to-br', themeClasses[state.config.theme]]"
+        :class="['relative h-screen w-full flex flex-col transition-all duration-700 bg-gradient-to-br', currentThemeClass]"
       >
-        <!-- 獎項自定義背景 -->
+        <!-- 獎項自定義背景圖層 -->
         <div
           v-if="currentView === 'lottery' && activePrize"
-          class="absolute inset-0 bg-cover bg-center opacity-30 transition-opacity duration-1000"
+          class="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none transition-all duration-1000"
           :style="{ backgroundImage: activePrize.bgUrl ? `url(${activePrize.bgUrl})` : '' }"
         ></div>
 
-        <!-- 主內容區 -->
-        <main class="page-content relative z-10">
-          <!-- 1. 設定頁面 -->
-          <section
-            v-if="currentView === 'settings'"
-            class="p-6 pb-32 animate-fadeIn max-w-6xl mx-auto space-y-6"
-          >
-            <h2 class="text-3xl font-black border-b border-white/20 pb-2">⚙️ 設定管理</h2>
+        <!-- 1. 設定頁面 -->
+        <main
+          v-if="currentView === 'settings'"
+          class="flex-1 overflow-y-auto p-6 pb-40 relative z-10"
+        >
+          <div class="max-w-6xl mx-auto space-y-6">
+            <h2 class="text-3xl font-black border-b border-white/20 pb-2 flex items-center gap-2">
+              ⚙️ 設定管理
+            </h2>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div class="glass-card p-6 rounded-3xl">
-                <h3 class="font-bold mb-4">👥 人員名單 (目前 {{ participantsAll.length }} 人)</h3>
+              <div class="glass-panel p-6 rounded-3xl">
+                <h3 class="font-bold mb-4">👥 參與名單 (目前 {{ participantsCount }} 人)</h3>
                 <textarea
                   v-model="state.rawParticipants"
-                  class="w-full h-64 bg-black/20 rounded-xl p-4 outline-none border border-white/10 text-sm"
+                  class="w-full h-64 bg-black/20 rounded-2xl p-4 outline-none border border-white/10 text-sm focus:border-white/50"
+                  placeholder="一行一個名字..."
                 ></textarea>
               </div>
 
-              <div class="glass-card p-6 rounded-3xl space-y-6">
+              <div class="glass-panel p-6 rounded-3xl space-y-6 text-white">
                 <div>
-                  <h3 class="font-bold mb-4">🎨 介面色系切換</h3>
+                  <h3 class="font-bold mb-4">🎨 系統色系切換</h3>
                   <div class="flex gap-4">
                     <button
-                      v-for="(val, key) in themeClasses"
+                      v-for="(val, key) in themeColors"
                       :key="key"
                       @click="state.config.theme = key"
-                      :class="['w-10 h-10 rounded-full border-4 transition-all', state.config.theme === key ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40', themeBtnBase[key]]"
+                      :class="['w-10 h-10 rounded-full border-4 transition-all', state.config.theme === key ? 'border-white scale-110' : 'border-transparent opacity-50', val.btn]"
                     ></button>
                   </div>
                 </div>
                 <div>
                   <h3 class="font-bold mb-2">📥 匯入獎項 CSV</h3>
-                  <div class="bg-white/5 p-4 rounded-xl border border-white/10">
-                    <input
-                      type="file"
-                      @change="importPrizeCSV"
-                      accept=".csv"
-                      class="text-xs w-full cursor-pointer"
-                    />
-                    <p class="text-[10px] mt-2 opacity-40 italic">
-                      格式：名稱, 獎品, 數量, 背景圖URL
-                    </p>
-                  </div>
+                  <input
+                    type="file"
+                    @change="importPrizeCSV"
+                    accept=".csv"
+                    class="text-xs block w-full bg-white/10 p-2 rounded-xl cursor-pointer"
+                  />
+                  <p class="text-[10px] mt-1 opacity-50">
+                    格式：獎項名稱, 獎品, 數量, 背景圖片連結
+                  </p>
                 </div>
                 <button
                   @click="resetSystem"
-                  class="w-full py-3 bg-red-600/30 hover:bg-red-600/60 rounded-xl font-bold transition"
+                  class="w-full py-4 bg-red-600 hover:bg-red-700 rounded-2xl font-black transition shadow-lg"
                 >
-                  🚨 初始化數據
+                  🚨 重設所有數據
                 </button>
               </div>
             </div>
 
-            <div class="glass-card p-6 rounded-3xl overflow-x-auto">
-              <h3 class="text-xl font-bold mb-6">🏆 獎項配置</h3>
-              <table class="w-full min-w-[900px]">
-                <thead class="text-left text-xs opacity-40 border-b border-white/10">
+            <!-- 獎項管理表格 -->
+            <div class="glass-panel p-6 rounded-3xl overflow-x-auto text-white">
+              <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">🏆 獎項清單</h3>
+                <button @click="addPrize" class="text-sm bg-white/20 px-4 py-1 rounded-full">
+                  + 手動新增
+                </button>
+              </div>
+              <table class="w-full text-left min-w-[800px]">
+                <thead class="text-xs opacity-50 border-b border-white/10">
                   <tr>
-                    <th class="pb-2">名稱與獎品</th>
+                    <th class="pb-2">名稱 / 獎品</th>
                     <th class="pb-2 w-24">數量</th>
                     <th class="pb-2 w-64">抽獎方式</th>
-                    <th class="pb-2">背景 URL</th>
-                    <th class="pb-2 w-10"></th>
+                    <th class="pb-2">背景圖片 URL</th>
+                    <th class="pb-2"></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-white/5">
-                  <tr v-for="(p, i) in state.prizes" :key="i">
+                <tbody>
+                  <tr v-for="(p, i) in state.prizes" :key="i" class="border-b border-white/5">
                     <td class="py-4 pr-4">
                       <input
                         v-model="p.name"
-                        class="bg-transparent border-b border-white/10 w-full mb-1 font-bold"
+                        class="bg-transparent border-b border-white/10 w-full mb-1 font-bold outline-none"
                       />
-                      <input v-model="p.reward" class="bg-transparent text-xs opacity-50 w-full" />
+                      <input
+                        v-model="p.reward"
+                        class="bg-transparent text-xs opacity-50 w-full outline-none"
+                      />
                     </td>
                     <td>
                       <input
                         v-model.number="p.count"
                         type="number"
-                        class="bg-transparent border-b border-white/10 w-16"
+                        class="bg-transparent border-b border-white/10 w-16 outline-none"
                       />
                     </td>
-                    <td class="text-xs">
-                      <div class="flex gap-4" v-if="p.count > 1">
+                    <td>
+                      <div class="flex gap-4 text-xs" v-if="p.count > 1">
                         <label class="flex items-center gap-1 cursor-pointer"
                           ><input type="radio" v-model="p.mode" value="single" /> 連續單抽</label
                         >
@@ -170,149 +181,137 @@
                           ><input type="radio" v-model="p.mode" value="all" /> 一次抽完</label
                         >
                       </div>
-                      <span v-else class="opacity-30 italic">自動單抽模式</span>
+                      <span v-else class="text-xs opacity-40 italic">單次抽獎模式</span>
                     </td>
                     <td>
                       <input
                         v-model="p.bgUrl"
-                        class="bg-transparent text-[10px] w-full opacity-40"
+                        class="bg-transparent text-[10px] w-full opacity-40 focus:opacity-100 outline-none"
                       />
                     </td>
                     <td>
-                      <button @click="state.prizes.splice(i, 1)" class="text-red-400 px-2">
-                        ✕
-                      </button>
+                      <button @click="state.prizes.splice(i, 1)" class="text-red-400">✕</button>
                     </td>
                   </tr>
                 </tbody>
               </table>
-              <button @click="addPrize" class="mt-4 text-sm text-blue-400 hover:text-blue-300">
-                ＋ 手動新增獎項
+            </div>
+          </div>
+        </main>
+
+        <!-- 2. 抽獎頁面 -->
+        <main
+          v-if="currentView === 'lottery'"
+          class="flex-1 flex flex-col p-8 relative z-10 text-white overflow-hidden"
+        >
+          <div v-if="activePrize" class="flex flex-col h-full max-w-6xl mx-auto w-full">
+            <!-- 頂部獎項卡 -->
+            <div
+              class="glass-panel p-6 rounded-[40px] flex items-center justify-between mb-8 shadow-2xl"
+            >
+              <button @click="prevPrize" class="w-14 h-14 rounded-full hover:bg-white/20 text-3xl">
+                ❮
+              </button>
+              <div class="text-center">
+                <h2 class="text-5xl md:text-7xl font-black glow-text tracking-tighter">
+                  {{ activePrize.name }}
+                </h2>
+                <p class="text-xl opacity-80 mt-1">獎品：{{ activePrize.reward }}</p>
+                <div
+                  class="mt-2 inline-block px-4 py-1 bg-white/20 rounded-full text-xs font-bold border border-white/10"
+                >
+                  剩餘名額：{{ remainingCount(activePrize.name) }} / {{ activePrize.count }}
+                </div>
+              </div>
+              <button @click="nextPrize" class="w-14 h-14 rounded-full hover:bg-white/20 text-3xl">
+                ❯
               </button>
             </div>
-          </section>
 
-          <!-- 2. 抽獎頁面 -->
-          <section
-            v-if="currentView === 'lottery'"
-            class="lottery-main px-6 animate-fadeIn relative"
-          >
-            <div v-if="activePrize" class="w-full max-w-6xl mx-auto flex flex-col h-full py-10">
-              <!-- 獎項頂部卡片 -->
+            <!-- 名字跳動區 (中間自適應) -->
+            <div class="flex-1 flex items-center justify-center">
               <div
-                class="glass-card p-6 rounded-[35px] flex items-center justify-between shadow-2xl relative z-10"
+                v-if="isSpinning"
+                class="text-7xl md:text-[10rem] font-black glow-text opacity-90 transition-all"
               >
-                <button
-                  @click="prevPrize"
-                  class="w-12 h-12 rounded-full hover:bg-white/10 text-2xl transition"
-                >
-                  ❮
-                </button>
-                <div class="text-center">
-                  <h2 class="text-5xl md:text-6xl font-black text-glow tracking-tighter">
-                    {{ activePrize.name }}
-                  </h2>
-                  <p class="text-xl opacity-70">獎品：{{ activePrize.reward }}</p>
-                  <span class="mt-2 text-xs font-bold bg-white/20 px-4 py-1 rounded-full">
-                    剩餘名額：{{ remainingCount(activePrize.name) }} / {{ activePrize.count }}
-                  </span>
-                </div>
-                <button
-                  @click="nextPrize"
-                  class="w-12 h-12 rounded-full hover:bg-white/10 text-2xl transition"
-                >
-                  ❯
-                </button>
+                {{ spinningName }}
               </div>
-
-              <!-- 亂數跳動區域 (中間) -->
-              <div class="flex-1 flex items-center justify-center">
-                <div
-                  v-if="isSpinning"
-                  class="text-8xl md:text-[10rem] font-black tracking-tighter text-glow opacity-90 transition-all"
-                >
-                  {{ spinningName }}
-                </div>
-                <div
-                  v-else-if="currentWinners.length === 0"
-                  class="text-5xl opacity-10 font-black tracking-[1.5rem]"
-                >
-                  READY
-                </div>
-                <div
-                  v-else
-                  class="text-8xl md:text-[10rem] font-black text-yellow-300 text-glow animate-pulse"
-                >
-                  {{ spinningName }}
-                </div>
+              <div
+                v-else-if="currentWinners.length === 0"
+                class="text-5xl opacity-10 font-black tracking-[1rem]"
+              >
+                READY
               </div>
-
-              <!-- 中獎人員累積區 (底部) -->
-              <div class="w-full flex flex-col items-center gap-6">
-                <div
-                  class="w-full max-w-4xl glass-card rounded-3xl p-4 min-h-[120px] max-h-[250px] overflow-y-auto"
-                >
-                  <transition-group
-                    name="winner"
-                    tag="div"
-                    class="flex flex-wrap justify-center gap-3"
-                  >
-                    <div
-                      v-for="win in currentWinners"
-                      :key="win.seed"
-                      class="bg-white/20 backdrop-blur-md px-6 py-3 rounded-2xl text-2xl font-black text-yellow-300 border border-yellow-500/30 shadow-lg"
-                    >
-                      {{ win.winner }}
-                    </div>
-                  </transition-group>
-                </div>
-
-                <div class="text-center space-y-3 pb-4">
-                  <p
-                    class="text-white/40 uppercase tracking-[0.4em] text-sm font-bold animate-pulse"
-                  >
-                    {{ isSpinning ? (activePrize.mode === 'single' ? '按 [空白鍵] 抽出下一位' : '按
-                    [空白鍵] 揭曉全部') : '按 [空白鍵] 開始' }}
-                  </p>
-                  <button
-                    v-if="!isSpinning && currentWinners.length > 0"
-                    @click="confirmRedraw"
-                    class="text-xs font-bold text-red-400 hover:text-red-300 transition"
-                  >
-                    ↺ 重抽此獎項 (人員將回流)
-                  </button>
-                </div>
+              <div
+                v-else
+                class="text-7xl md:text-[10rem] font-black text-yellow-300 glow-text animate-pulse"
+              >
+                {{ spinningName }}
               </div>
             </div>
-            <div
-              v-else
-              class="h-full flex items-center justify-center opacity-20 text-2xl font-bold italic"
-            >
-              請先配置獎項與名單
-            </div>
-          </section>
 
-          <!-- 3. 結果頁面 -->
-          <section
-            v-if="currentView === 'results'"
-            class="p-6 pb-40 animate-fadeIn max-w-4xl mx-auto space-y-6"
+            <!-- 已中獎顯示區 (底部固定) -->
+            <div class="mt-8 flex flex-col items-center gap-4">
+              <div
+                class="w-full glass-panel rounded-[30px] p-6 min-h-[150px] max-h-[250px] overflow-y-auto shadow-inner"
+              >
+                <transition-group name="list" tag="div" class="flex flex-wrap justify-center gap-3">
+                  <div
+                    v-for="win in currentWinners"
+                    :key="win.seed"
+                    class="bg-white/20 border border-yellow-500/30 px-6 py-2 rounded-2xl text-2xl font-black text-yellow-300"
+                  >
+                    {{ win.winner }}
+                  </div>
+                </transition-group>
+              </div>
+
+              <div class="text-center pb-20">
+                <p
+                  class="text-white/40 uppercase tracking-[0.4em] text-sm font-bold animate-pulse mb-2"
+                >
+                  {{ isSpinning ? '按 [空白鍵] 揭曉下一位' : '按 [空白鍵] 開始抽獎' }}
+                </p>
+                <button
+                  v-if="!isSpinning && currentWinners.length > 0"
+                  @click="confirmRedraw"
+                  class="text-xs font-bold text-red-400 border border-red-500/30 px-4 py-1 rounded-full hover:bg-red-500 hover:text-white transition"
+                >
+                  ↺ 清除紀錄並重抽
+                </button>
+              </div>
+            </div>
+          </div>
+          <div
+            v-else
+            class="h-full flex items-center justify-center opacity-20 text-2xl font-black"
           >
+            請先配置獎項與名單
+          </div>
+        </main>
+
+        <!-- 3. 結果頁面 -->
+        <main
+          v-if="currentView === 'results'"
+          class="flex-1 overflow-y-auto p-8 pb-40 relative z-10 text-white"
+        >
+          <div class="max-w-4xl mx-auto space-y-6">
             <div class="flex justify-between items-center border-b border-white/20 pb-4">
-              <h2 class="text-3xl font-black">📋 中獎總名單</h2>
+              <h2 class="text-3xl font-black">📋 中獎總清單</h2>
               <button
                 @click="exportCSV"
-                class="bg-emerald-600 hover:bg-emerald-500 px-8 py-2 rounded-xl font-bold shadow-lg transition"
+                class="bg-emerald-600 hover:bg-emerald-700 px-8 py-2 rounded-xl font-bold shadow-lg transition"
               >
                 匯出 CSV
               </button>
             </div>
-            <div class="glass-card rounded-3xl overflow-hidden">
+            <div class="glass-panel rounded-3xl overflow-hidden">
               <table class="w-full text-left">
                 <thead class="bg-white/10 text-xs text-white/50">
                   <tr>
-                    <th class="p-5">獎項名稱</th>
-                    <th class="p-5">得獎英雄</th>
-                    <th class="p-5 font-mono">Timestamp Seed</th>
+                    <th class="p-6">獎項名稱</th>
+                    <th class="p-6">中獎人</th>
+                    <th class="p-6">時間種子碼</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
@@ -321,23 +320,29 @@
                     :key="res.seed"
                     class="hover:bg-white/5 transition"
                   >
-                    <td class="p-5 font-bold text-yellow-400">{{ res.prizeName }}</td>
-                    <td class="p-5 font-black text-2xl">{{ res.winner }}</td>
-                    <td class="p-5 font-mono text-[10px] opacity-20">{{ res.seed }}</td>
+                    <td class="p-6 font-bold text-yellow-400">{{ res.prizeName }}</td>
+                    <td class="p-6 font-black text-3xl tracking-tight">{{ res.winner }}</td>
+                    <td class="p-6 font-mono text-[10px] opacity-20">{{ res.seed }}</td>
+                  </tr>
+                  <tr v-if="state.results.length === 0">
+                    <td colspan="3" class="p-32 text-center opacity-20 italic italic text-xl">
+                      尚無抽獎紀錄
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </section>
+          </div>
         </main>
 
-        <!-- 底部功能切換 -->
+        <!-- 底部功能選單 (固定) -->
         <nav
-          :class="['nav-container glass-card rounded-t-[35px] p-2 flex flex-col items-center', isNavExpanded ? 'expanded' : '']"
+          :class="['nav-drawer glass-panel rounded-t-[35px] p-2 flex flex-col items-center shadow-2xl', isNavExpanded ? 'active' : '']"
         >
+          <!-- 選單展開條 -->
           <button
             @click="isNavExpanded = !isNavExpanded"
-            class="w-full py-4 flex flex-col items-center group outline-none"
+            class="w-full py-4 flex flex-col items-center group"
           >
             <div
               class="w-12 h-1.5 bg-white/20 rounded-full group-hover:bg-white/40 transition-colors"
@@ -369,51 +374,73 @@
           const spinningName = ref('')
           let spinTimer = null
 
-          const themeClasses = {
-            red: 'from-red-950 via-red-800 to-red-700',
-            black: 'from-black via-zinc-900 to-zinc-900',
-            blue: 'from-blue-950 via-blue-800 to-blue-700',
-            green: 'from-emerald-950 via-emerald-800 to-emerald-700',
-            yellow: 'from-amber-950 via-amber-700 to-amber-600',
-          }
-
-          const themeBtnBase = {
-            red: 'bg-red-600',
-            black: 'bg-zinc-800',
-            blue: 'bg-blue-600',
-            green: 'bg-emerald-600',
-            yellow: 'bg-amber-500',
+          const themeColors = {
+            red: {
+              bg: 'bg-red-700',
+              grad: 'from-red-950 via-red-800 to-red-700',
+              btn: 'bg-red-600',
+            },
+            black: {
+              bg: 'bg-zinc-800',
+              grad: 'from-black via-zinc-950 to-zinc-900',
+              btn: 'bg-zinc-800',
+            },
+            blue: {
+              bg: 'bg-blue-700',
+              grad: 'from-blue-950 via-blue-800 to-blue-700',
+              btn: 'bg-blue-600',
+            },
+            green: {
+              bg: 'bg-emerald-700',
+              grad: 'from-emerald-950 via-emerald-800 to-emerald-700',
+              btn: 'bg-emerald-600',
+            },
+            yellow: {
+              bg: 'bg-amber-600',
+              grad: 'from-amber-950 via-amber-700 to-amber-600',
+              btn: 'bg-amber-500',
+            },
           }
 
           const state = reactive({
             rawParticipants: '',
-            prizes: [{ name: '壹等獎', reward: '神秘大禮', count: 1, mode: 'single', bgUrl: '' }],
+            prizes: [{ name: '壹等獎', reward: '神秘禮物', count: 1, mode: 'single', bgUrl: '' }],
             results: [],
             config: { theme: 'red' },
             currentIndex: 0,
           })
 
+          // 初始化與存取
           onMounted(() => {
-            const saved = localStorage.getItem('lottery_final_v3')
-            if (saved) Object.assign(state, JSON.parse(saved))
-            window.addEventListener('keydown', handleSpaceKey)
+            const saved = localStorage.getItem('lottery_v6_save')
+            if (saved) {
+              try {
+                const parsed = JSON.parse(saved)
+                Object.assign(state, parsed)
+              } catch (e) {
+                console.error('Data error', e)
+              }
+            }
+            window.addEventListener('keydown', handleKeydown)
           })
 
-          watch(state, (v) => localStorage.setItem('lottery_final_v3', JSON.stringify(v)), {
+          watch(state, (v) => localStorage.setItem('lottery_v6_save', JSON.stringify(v)), {
             deep: true,
           })
 
+          // 計算屬性
+          const currentThemeClass = computed(() => themeColors[state.config.theme].grad)
           const participantsAll = computed(() =>
             state.rawParticipants
               .split('\n')
               .map((s) => s.trim())
               .filter((s) => s),
           )
+          const participantsCount = computed(() => participantsAll.value.length)
           const availablePool = computed(() => {
             const winners = state.results.map((r) => r.winner)
             return participantsAll.value.filter((p) => !winners.includes(p))
           })
-
           const activePrize = computed(() => state.prizes[state.currentIndex])
           const currentWinners = computed(() => {
             if (!activePrize.value) return []
@@ -422,31 +449,32 @@
 
           function remainingCount(name) {
             const p = state.prizes.find((i) => i.name === name)
-            const wonCount = state.results.filter((r) => r.prizeName === name).length
-            return p ? p.count - wonCount : 0
+            const won = state.results.filter((r) => r.prizeName === name).length
+            return p ? p.count - won : 0
           }
 
-          function handleSpaceKey(e) {
+          // 按鍵與抽獎邏輯
+          function handleKeydown(e) {
             if (e.code === 'Space' && currentView.value === 'lottery' && activePrize.value) {
               e.preventDefault()
               if (isSpinning.value) {
-                // 正在抽獎中，按下空白鍵的邏輯
-                if (
-                  activePrize.value.mode === 'single' &&
-                  remainingCount(activePrize.value.name) > 1
-                ) {
-                  recordWinner(false) // 僅記錄，不停止動畫
+                // 抽獎中按下空白鍵
+                const isSingleMode = activePrize.value.mode === 'single'
+                const hasMore = remainingCount(activePrize.value.name) > 1
+
+                if (isSingleMode && hasMore) {
+                  performRecord(false) // 僅存入，不停止動畫
                 } else {
-                  recordWinner(true) // 最後一位或一次抽完，停止動畫
+                  performRecord(true) // 最後一位或一次抽完，停止
                 }
               } else {
-                startLottery()
+                startSpinning()
               }
             }
           }
 
-          function startLottery() {
-            if (remainingCount(activePrize.value.name) <= 0) return alert('此獎項已抽完')
+          function startSpinning() {
+            if (remainingCount(activePrize.value.name) <= 0) return alert('名額已抽完')
             if (availablePool.value.length === 0) return alert('名單內已無待抽人員')
             isSpinning.value = true
             spinTimer = setInterval(() => {
@@ -455,19 +483,18 @@
             }, 50)
           }
 
-          function recordWinner(shouldStop) {
+          function performRecord(stopAnimation) {
             const timestamp = Date.now()
             const pool = [...availablePool.value]
 
             if (activePrize.value.mode === 'all') {
-              // 一次抽完模式
-              const countToDraw = Math.min(remainingCount(activePrize.value.name), pool.length)
-              for (let i = 0; i < countToDraw; i++) {
-                const luckyIdx = (timestamp + i) % pool.length
-                const winnerName = pool.splice(luckyIdx, 1)[0]
+              const count = Math.min(remainingCount(activePrize.value.name), pool.length)
+              for (let i = 0; i < count; i++) {
+                const idx = (timestamp + i) % pool.length
+                const winner = pool.splice(idx, 1)[0]
                 state.results.push({
                   prizeName: activePrize.value.name,
-                  winner: winnerName,
+                  winner,
                   seed: timestamp + i,
                 })
               }
@@ -475,15 +502,9 @@
               clearInterval(spinTimer)
               isSpinning.value = false
             } else {
-              // 連續單抽模式
-              const winnerName = spinningName.value // 直接抓取目前畫面上顯示的名字
-              state.results.push({
-                prizeName: activePrize.value.name,
-                winner: winnerName,
-                seed: timestamp,
-              })
-
-              if (shouldStop) {
+              const winner = spinningName.value
+              state.results.push({ prizeName: activePrize.value.name, winner, seed: timestamp })
+              if (stopAnimation) {
                 clearInterval(spinTimer)
                 isSpinning.value = false
               }
@@ -494,14 +515,14 @@
             if (isSpinning.value) return
             state.currentIndex =
               (state.currentIndex - 1 + state.prizes.length) % state.prizes.length
-            spinningName.value =
-              currentWinners.value.length > 0
-                ? currentWinners.value[currentWinners.value.length - 1].winner
-                : ''
+            resetDisplay()
           }
           function nextPrize() {
             if (isSpinning.value) return
             state.currentIndex = (state.currentIndex + 1) % state.prizes.length
+            resetDisplay()
+          }
+          function resetDisplay() {
             spinningName.value =
               currentWinners.value.length > 0
                 ? currentWinners.value[currentWinners.value.length - 1].winner
@@ -529,14 +550,14 @@
           }
 
           function confirmRedraw() {
-            if (confirm('警告：這將清除該獎項目前所有中獎者，並讓名額回流。確定嗎？')) {
+            if (confirm('確定作廢此獎項目前的結果並重抽？')) {
               state.results = state.results.filter((r) => r.prizeName !== activePrize.value.name)
               spinningName.value = ''
             }
           }
 
           function resetSystem() {
-            if (confirm('警告：這將清除所有數據，包含名單與紀錄！')) {
+            if (confirm('重設將清除所有本機數據，確定？')) {
               localStorage.clear()
               location.reload()
             }
@@ -550,28 +571,29 @@
           }
 
           function exportCSV() {
-            let c = '\ufeff獎項,得獎人,時間種子\n'
+            let c = '\ufeff獎項,得獎人,Timestamp Seed\n'
             state.results.forEach((r) => (c += `${r.prizeName},${r.winner},${r.seed}\n`))
             const a = document.createElement('a')
             a.href = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' }))
-            a.download = `中獎清單_${new Date().getTime()}.csv`
+            a.download = `中獎清單_${Date.now()}.csv`
             a.click()
           }
 
           const tabs = [
-            { id: 'settings', name: 'Setting' },
-            { id: 'lottery', name: 'Lottery' },
-            { id: 'results', name: 'Results' },
+            { id: 'settings', name: 'Setting 設定' },
+            { id: 'lottery', name: 'Lottery 抽獎' },
+            { id: 'results', name: 'Results 結果' },
           ]
 
           return {
             currentView,
             tabs,
-            themeClasses,
-            themeBtnBase,
+            themeColors,
+            currentThemeClass,
             state,
             isNavExpanded,
             participantsAll,
+            participantsCount,
             availablePool,
             activePrize,
             isSpinning,
