@@ -1,6 +1,6 @@
 {
-  "name": "lottory",
-  "version": "0.0.0",
+  "name": "web-lottery",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,10 +8,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "vite build",
     "preview": "vite preview",
-    "build-only": "vite build",
-    "type-check": "vue-tsc --build",
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
@@ -22,11 +20,13 @@
     "@types/node": "^24.10.4",
     "@vitejs/plugin-vue": "^6.0.3",
     "@vue/tsconfig": "^0.8.1",
-    "npm-run-all2": "^8.0.4",
+    "autoprefixer": "^10.7.0",
+    "postcss": "^8.5.33",
     "prettier": "3.7.4",
+    "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",
     "vite": "^7.3.0",
-    "vite-plugin-vue-devtools": "^8.0.5",
-    "vue-tsc": "^3.2.1"
+    "vite-plugin-singlefile": "^2.3.4",
+    "vite-plugin-vue-devtools": "^8.0.5"
   }
 }

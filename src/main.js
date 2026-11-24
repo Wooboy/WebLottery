@@ -1,6 +1,9 @@
-const { createApp, reactive, ref, computed, onMounted, watch } = Vue
+import { createApp, reactive, ref, computed, onMounted, watch } from 'vue'
+import './style.css'
 
-const app = createApp({
+const STORAGE_KEY = 'lottery_app_v2026_data'
+
+createApp({
   setup() {
     const currentView = ref('lottery')
     const isNavExpanded = ref(false)
@@ -30,7 +33,7 @@ const app = createApp({
 
     // --- 核心邏輯：資料初始化 ---
     onMounted(() => {
-      const saved = localStorage.getItem('lottery_app_v2026_data')
+      const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
         try {
           const parsed = JSON.parse(saved)
@@ -39,6 +42,12 @@ const app = createApp({
           console.error('解析存檔失敗:', e)
         }
       }
+      // 存檔中的獎項位置若超出範圍（例如曾刪除獎項），回到第一個獎項
+      if (!(state.currentIndex >= 0 && state.currentIndex < state.prizes.length)) {
+        state.currentIndex = 0
+      }
+      // 重新進入時，中央大字顯示目前獎項的最後一位中獎者
+      resetPrizeView()
       // 監聽鍵盤空白鍵
       window.addEventListener('keydown', handleKeydown)
     })
@@ -47,7 +56,7 @@ const app = createApp({
     watch(
       state,
       (newVal) => {
-        localStorage.setItem('lottery_app_v2026_data', JSON.stringify(newVal))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newVal))
       },
       { deep: true },
     )
@@ -78,27 +87,51 @@ const app = createApp({
       return p ? Math.max(0, p.count - won) : 0
     }
 
+    // --- 亂數工具 ---
+    // 使用 crypto.getRandomValues 產生 [0, n) 的均勻整數（拒絕取樣避免模數偏差）
+    function secureRandomInt(n) {
+      if (n <= 0) throw new Error('secureRandomInt: n must be > 0')
+      const limit = Math.floor(0x100000000 / n) * n
+      const buf = new Uint32Array(1)
+      do {
+        crypto.getRandomValues(buf)
+      } while (buf[0] >= limit)
+      return buf[0] % n
+    }
+
+    let drawCounter = 0
+    function recordWinner(winner, timestamp) {
+      state.results.push({
+        id: `${timestamp}-${drawCounter++}`,
+        prizeName: activePrize.value.name,
+        winner,
+        seed: timestamp,
+      })
+    }
+
     // --- 抽獎動作 ---
     function handleKeydown(e) {
       // 禁止在輸入框按空白鍵時觸發抽獎
-      if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return
+      const tag = e.target.tagName
+      if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || e.target.isContentEditable)
+        return
 
       if (e.code === 'Space' && currentView.value === 'lottery' && activePrize.value) {
         e.preventDefault()
+        // 按住空白鍵的自動重複不視為新的操作
+        if (e.repeat) return
         if (isSpinning.value) {
-          // 若是連續單抽模式且還有下位，則「記錄但不停止」
-          const isSingleMode = activePrize.value.mode === 'single'
-          const hasMoreThanOne = remainingCount(activePrize.value.name) > 1
-
-          if (isSingleMode && hasMoreThanOne) {
-            performDrawRecord(false) // 記錄一人，動畫繼續
-          } else {
-            performDrawRecord(true) // 最後一位或一次抽完模式，停止
-          }
+          performDraw()
         } else {
           startSpinning()
         }
       }
+    }
+
+    function stopSpinning() {
+      clearInterval(spinTimer)
+      spinTimer = null
+      isSpinning.value = false
     }
 
     function startSpinning() {
@@ -108,40 +141,44 @@ const app = createApp({
       isSpinning.value = true
       spinTimer = setInterval(() => {
         const pool = availablePool.value
-        spinningName.value = pool[Math.floor(Math.random() * pool.length)]
+        // 跳動畫面僅供視覺效果，實際中獎者於按鍵當下另行抽出
+        spinningName.value = pool.length ? pool[secureRandomInt(pool.length)] : ''
       }, 60)
     }
 
-    function performDrawRecord(stopAnimation) {
+    function performDraw() {
       const timestamp = Date.now()
       const pool = [...availablePool.value]
+      const remaining = remainingCount(activePrize.value.name)
+
+      if (pool.length === 0 || remaining <= 0) {
+        stopSpinning()
+        if (pool.length === 0) alert('可用人員名單已空！')
+        return
+      }
 
       if (activePrize.value.mode === 'all') {
-        // 一次性抽完所有名額
-        const toDraw = Math.min(remainingCount(activePrize.value.name), pool.length)
+        // 一次抽完：從剩餘名單中不重複地均勻抽出（部分 Fisher–Yates）
+        const toDraw = Math.min(remaining, pool.length)
+        let last = ''
         for (let i = 0; i < toDraw; i++) {
-          const idx = (timestamp + i) % pool.length
-          const winner = pool.splice(idx, 1)[0]
-          state.results.push({ prizeName: activePrize.value.name, winner, seed: timestamp + i })
+          const idx = secureRandomInt(pool.length)
+          last = pool.splice(idx, 1)[0]
+          recordWinner(last, timestamp)
         }
-        // 最後一位名字留在畫面上
-        if (state.results.length > 0) {
-          spinningName.value = state.results[state.results.length - 1].winner
-        }
-        clearInterval(spinTimer)
-        isSpinning.value = false
+        spinningName.value = last
+        stopSpinning()
+        if (toDraw < remaining) alert(`可用人員不足，僅抽出 ${toDraw} 位`)
       } else {
-        // 單抽模式
-        const winner = spinningName.value
-        state.results.push({
-          prizeName: activePrize.value.name,
-          winner: winner,
-          seed: timestamp,
-        })
+        // 連續單抽：於按鍵當下從「最新」可用名單抽出一位，不依賴畫面上正在跳動的名字
+        const winner = pool[secureRandomInt(pool.length)]
+        recordWinner(winner, timestamp)
+        spinningName.value = winner
 
-        if (stopAnimation) {
-          clearInterval(spinTimer)
-          isSpinning.value = false
+        // 名額抽滿或名單用盡才停止；否則動畫持續
+        if (remaining - 1 <= 0 || pool.length - 1 <= 0) {
+          stopSpinning()
+          if (remaining - 1 > 0) alert('可用人員名單已空，無法再抽！')
         }
       }
     }
@@ -197,7 +234,8 @@ const app = createApp({
 
     function resetSystem() {
       if (confirm('🚨 確定要刪除所有資料（名單、紀錄、設定）嗎？這將無法復原！')) {
-        localStorage.clear()
+        // 只刪除本系統的存檔，避免清掉同源（例如所有本機 file:// 頁面）其他程式的資料
+        localStorage.removeItem(STORAGE_KEY)
         location.reload()
       }
     }

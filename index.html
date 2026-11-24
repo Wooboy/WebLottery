@@ -4,11 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>專業抽獎系統 V2.0</title>
-    <!-- 1. 外部資源 CDN -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 2. 外部樣式表 -->
-    <link rel="stylesheet" href="style.css" />
   </head>
   <body class="bg-black text-white antialiased">
     <div id="app" v-cloak>
@@ -217,7 +212,7 @@
                 <transition-group name="list" tag="div" class="flex flex-wrap justify-center gap-3">
                   <div
                     v-for="win in currentWinners"
-                    :key="win.seed"
+                    :key="win.id || win.seed"
                     class="bg-white/20 border border-yellow-500/30 px-6 py-2 rounded-2xl text-2xl font-black text-yellow-300 shadow-xl"
                   >
                     {{ win.winner }}
@@ -277,7 +272,7 @@
                 <tbody class="divide-y divide-white/5">
                   <tr
                     v-for="res in state.results"
-                    :key="res.seed"
+                    :key="res.id || res.seed"
                     class="hover:bg-white/5 transition"
                   >
                     <td class="p-6 font-bold text-yellow-400">{{ res.prizeName }}</td>
@@ -326,7 +321,7 @@
       </div>
     </div>
 
-    <!-- 邏輯腳本載入 -->
-    <script src="app.js"></script>
+    <!-- 邏輯腳本載入 (Vite 打包，Vue / Tailwind 皆內嵌，可離線使用) -->
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
