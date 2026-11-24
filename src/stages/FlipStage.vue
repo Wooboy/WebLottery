@@ -103,21 +103,19 @@ defineExpose({ press })
       >
         <div class="card-inner">
           <div
-            class="card-face card-back rounded-2xl border-2 border-white/40 flex items-center justify-center font-black shadow-xl hover:border-yellow-300 transition-colors"
+            class="card-face card-back rounded-2xl flex items-center justify-center font-black shadow-xl transition-colors"
           >
             <span :class="[sizeClass.num, 'opacity-80']">{{ i + 1 }}</span>
           </div>
           <div
-            class="card-face card-front rounded-2xl border-2 border-yellow-300 bg-yellow-400/25 flex items-center justify-center p-2 shadow-[0_0_30px_rgba(253,224,71,0.4)]"
+            class="card-face card-front rounded-2xl flex flex-col items-center justify-center p-2"
           >
             <span
-              :class="[
-                sizeClass.name,
-                'font-black text-yellow-200 glow-text break-all text-center',
-              ]"
+              :class="[sizeClass.name, 'font-black text-gold break-all text-center leading-tight']"
             >
               {{ c.name }}
             </span>
+            <span class="card-id">{{ c.id }}</span>
           </div>
         </div>
       </button>
@@ -129,7 +127,7 @@ defineExpose({ press })
 <style scoped>
 .card {
   perspective: 1000px;
-  animation: dealIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: dealIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 .card-inner {
   position: relative;
@@ -148,12 +146,24 @@ defineExpose({ press })
 }
 .card-back {
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.08) 0 10px, transparent 10px 20px),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.05));
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.06) 0 10px, transparent 10px 20px),
+    color-mix(in srgb, var(--accent) 45%, var(--ink));
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, white);
+  color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
+}
+.card-back:hover {
+  border-color: var(--gold);
 }
 .card-front {
   transform: rotateY(180deg);
+  background: var(--gold-soft);
+  border: 2px solid var(--gold);
+}
+.card-id {
+  font-family: Consolas, monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
 }
 @keyframes dealIn {
   from {

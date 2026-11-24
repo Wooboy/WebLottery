@@ -7,21 +7,20 @@ import { useStageKit, stageProps } from './kit.js'
 const props = defineProps(stageProps)
 const kit = useStageKit()
 
+// 球的顏色：低彩度的中性色＋主題色＋少量金色，避免搶過中獎者
 const COLORS = [
-  '#ef4444',
-  '#f59e0b',
-  '#10b981',
-  '#3b82f6',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
+  '#e5e7eb',
+  'color-mix(in srgb, var(--accent) 65%, white)',
+  '#cbd5e1',
+  'var(--gold)',
+  '#94a3b8',
+  'color-mix(in srgb, var(--accent) 85%, black)',
 ]
 
 const phase = ref('idle') // idle | running
 const shaking = ref(false)
 const capsule = ref(null) // { color, state: 'drop' | 'open', key }
-const result = ref('')
+const result = ref(null) // { id, name }
 let capsuleKey = 0
 
 // 球的位置：在圓頂內隨機分布（純視覺）
@@ -49,7 +48,7 @@ onMounted(() => {
 onBeforeUnmount(() => observer?.disconnect())
 
 const isAll = computed(() => props.prize.mode === 'all' && props.prize.count > 1)
-const shown = computed(() => result.value || props.winners[props.winners.length - 1]?.name || '')
+const shown = computed(() => result.value || props.winners[props.winners.length - 1] || null)
 
 watchEffect(() => {
   props.ctx.setHint(phase.value === 'idle' ? '按 [空白鍵] 轉動扭蛋機' : '扭蛋中…')
@@ -58,7 +57,7 @@ watchEffect(() => {
 async function once(fast) {
   const { ctx } = props
   const [winner] = ctx.decide(1)
-  result.value = ''
+  result.value = null
   capsule.value = null
   shaking.value = true
   const shakeMs = fast ? 800 : 1700
@@ -71,7 +70,7 @@ async function once(fast) {
   capsule.value.state = 'open'
   ctx.sfx.pop()
   await kit.sleep(350)
-  result.value = winner.name
+  result.value = winner
   ctx.commit([winner], { big: props.prize.count === 1 })
 }
 
@@ -150,12 +149,10 @@ defineExpose({ press })
 
     <!-- 揭曉 -->
     <div class="text-center min-w-[30%]">
-      <div
-        v-if="shown && !shaking"
-        :key="shown"
-        class="reveal text-[clamp(2.5rem,7vw,6rem)] font-black text-yellow-300 glow-text tracking-tight"
-      >
-        {{ shown }}
+      <div v-if="shown && !shaking" :key="shown.id" class="reveal result-card">
+        <div class="result-lbl">恭喜中獎</div>
+        <div class="result-name">{{ shown.name }}</div>
+        <div v-if="shown.id" class="result-id">{{ shown.id }}</div>
       </div>
       <div v-else class="text-4xl opacity-10 font-black tracking-[1rem]">
         {{ shaking ? '…' : 'READY' }}
@@ -165,6 +162,30 @@ defineExpose({ press })
 </template>
 
 <style scoped>
+.result-card {
+  display: inline-block;
+  text-align: left;
+  padding: 1.2rem 2rem;
+  border-radius: 1.2rem;
+  background: var(--gold-soft);
+  border: 1px solid var(--gold-line);
+}
+.result-lbl {
+  font-size: clamp(0.8rem, 1.1vw, 1.3rem);
+  letter-spacing: 0.25em;
+  color: var(--muted);
+}
+.result-name {
+  font-size: clamp(2.5rem, 6vw, 6.5rem);
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--gold);
+}
+.result-id {
+  font-family: Consolas, monospace;
+  font-size: clamp(0.9rem, 1.4vw, 1.6rem);
+  color: var(--muted);
+}
 .machine {
   width: 260px;
   height: 370px;
@@ -179,7 +200,7 @@ defineExpose({ press })
   box-shadow: inset 0 -20px 40px rgba(0, 0, 0, 0.25);
 }
 .body {
-  background: linear-gradient(160deg, #ef4444, #991b1b);
+  background: linear-gradient(160deg, var(--accent), color-mix(in srgb, var(--accent) 45%, black));
   border: 3px solid rgba(255, 255, 255, 0.35);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }

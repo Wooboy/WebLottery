@@ -1,173 +1,284 @@
 <script setup>
-// 老虎機：第一下滾輪開始轉動，第二下抽出中獎者，滾輪依序減速停在中獎者身上
+// 老虎機（員編轉輪）：一次抽一位。轉輪數 = 員編長度，每輪在 A–Z、0–9 間轉動。
+// 第一下開始轉動；第二下以安全亂數抽出中獎者，轉輪由左到右依序停在其員編上，
+// 每停一碼顯示「還有幾人符合」，全部停下後才帶出人名。
+// 一次抽完：第一位手動停止，之後自動連續轉到抽滿。
 import { ref, computed, watchEffect } from 'vue'
-import { useStageKit, stageProps, easeOutQuad } from './kit.js'
-import { pick } from '../lib/random.js'
+import { useStageKit, stageProps } from './kit.js'
 
 const props = defineProps(stageProps)
 const kit = useStageKit()
 
-const SPEED = 16 // 每秒經過的名字數
-const phase = ref('idle') // idle | spinning | stopping
-const reels = ref([])
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+const SPEED = 14 // 每秒經過的字元數
+const STOP_MS = 1300 // 每個轉輪減速停止的時間
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
+
+const phase = ref('idle') // idle | spinning | stopping | chaining
+const reels = ref([]) // { pos, state: 'spin' | 'stop' | 'lock', speed }
+const matchInfo = ref(null) // { prefix, rest, count }
+const revealed = ref(null) // { id, name }
 let stopLoop = null
 
-const idleNames = computed(() => {
-  const w = props.winners
-  return w.length ? [w[w.length - 1].name] : ['?']
+const isAll = computed(() => props.prize.mode === 'all' && props.prize.count > 1)
+const lastWinner = computed(() => props.winners[props.winners.length - 1] || null)
+const idLength = computed(() => {
+  const sample = props.pool[0]?.id || lastWinner.value?.id || ''
+  return Math.min(5, Math.max(3, sample.length || 4))
 })
-
-const sizeClass = computed(() => {
-  const n = Math.max(1, reels.value.length)
-  if (n === 1) return { box: 'w-[min(92%,900px)] h-[180px]', text: 'text-[clamp(3rem,9vw,7.5rem)]' }
-  if (n <= 3) return { box: 'w-[min(31%,360px)] h-[110px]', text: 'text-5xl' }
-  if (n === 4) return { box: 'w-[min(44%,420px)] h-[110px]', text: 'text-5xl' }
-  if (n <= 12) return { box: 'w-[210px] h-[84px]', text: 'text-3xl' }
-  return { box: 'w-[150px] h-[58px]', text: 'text-xl' }
+// 待機時顯示上一位中獎者的員編（或問號）
+const idleChars = computed(() => {
+  const id = (lastWinner.value?.id || '').toUpperCase()
+  return Array.from({ length: idLength.value }, (_, i) => id[i] || '?')
 })
+const shownPerson = computed(
+  () => revealed.value || (phase.value === 'idle' ? lastWinner.value : null),
+)
 
 watchEffect(() => {
   props.ctx.setHint(
     phase.value === 'spinning'
       ? '按 [空白鍵] 停止'
-      : phase.value === 'stopping'
-        ? '揭曉中…'
-        : '按 [空白鍵] 開始轉動',
+      : phase.value === 'idle'
+        ? '按 [空白鍵] 開始轉動'
+        : '轉輪依序停止中…',
   )
 })
 
+const charAt = (i) => CHARS[((i % CHARS.length) + CHARS.length) % CHARS.length]
 function rowsOf(r) {
-  const len = r.strip.length
   const i = Math.floor(r.pos)
-  return [r.strip[((i % len) + len) % len], r.strip[(((i + 1) % len) + len) % len]]
+  return [charAt(i - 1), charAt(i), charAt(i + 1), charAt(i + 2)]
 }
-function offsetOf(r) {
-  return -((r.pos - Math.floor(r.pos)) / 2) * 100
-}
+const offsetOf = (r) => -((r.pos - Math.floor(r.pos)) * 25)
 
-function makeStrip(extra) {
-  return Array.from({ length: 40 + extra }, () => pick(props.pool)?.name || '')
-}
-
-function start() {
-  const { ctx } = props
-  if (!ctx.canDraw()) return
-  const n = ctx.roundSize()
-  reels.value = Array.from({ length: n }, () => {
-    const strip = makeStrip(n * 5)
-    return { strip, pos: Math.random() * strip.length, landed: false }
-  })
-  phase.value = 'spinning'
-  ctx.setBusy(true)
-  let lastIdx = -1
+function spin() {
+  revealed.value = null
+  matchInfo.value = null
+  reels.value = Array.from({ length: idLength.value }, () => ({
+    pos: Math.random() * CHARS.length,
+    state: 'spin',
+    speed: SPEED * (0.85 + Math.random() * 0.3),
+  }))
+  let last = -1
   stopLoop = kit.loop((dt) => {
-    for (const r of reels.value) r.pos += dt * SPEED
-    const idx = Math.floor(reels.value[0].pos)
-    if (idx !== lastIdx) {
-      lastIdx = idx
-      ctx.sfx.tick()
+    for (const r of reels.value) if (r.state === 'spin') r.pos += dt * r.speed
+    const spinning = reels.value.find((r) => r.state === 'spin')
+    if (spinning) {
+      const idx = Math.floor(spinning.pos)
+      if (idx !== last) {
+        last = idx
+        props.ctx.sfx.tick()
+      }
     }
   })
 }
 
-async function stop() {
+async function land() {
   const { ctx } = props
-  phase.value = 'stopping'
+  const [winner] = ctx.decide(1)
+  const id = winner.id.toUpperCase()
+  for (let j = 0; j < reels.value.length; j++) {
+    const r = reels.value[j]
+    const target = Math.max(0, CHARS.indexOf(id[j]))
+    const p0 = r.pos
+    let landing = Math.ceil(p0) + 8
+    landing += (((target - landing) % CHARS.length) + CHARS.length) % CHARS.length
+    const dist = landing - p0
+    r.state = 'stop'
+    let last = -1
+    await kit.animate(STOP_MS, (t) => {
+      r.pos = p0 + dist * easeOutCubic(t)
+      const idx = Math.floor(r.pos)
+      if (idx !== last) {
+        last = idx
+        ctx.sfx.tick()
+      }
+    })
+    r.pos = landing
+    r.state = 'lock'
+    ctx.sfx.hit()
+    const prefix = id.slice(0, j + 1)
+    matchInfo.value = {
+      prefix,
+      rest: id.length - prefix.length,
+      count: props.pool.filter((p) => p.id.toUpperCase().startsWith(prefix)).length,
+    }
+    await kit.sleep(j === reels.value.length - 1 ? 500 : 350)
+  }
   stopLoop?.()
-  const people = ctx.decide(reels.value.length)
-  reels.value = reels.value.slice(0, people.length)
-  let lastIdx = -1
-  await Promise.all(
-    reels.value.map((r, i) => {
-      const p0 = r.pos
-      const landing = Math.ceil(p0) + 14 + i * 5
-      r.strip[landing % r.strip.length] = people[i].name
-      const dist = landing - p0
-      return kit
-        .animate(((2 * dist) / SPEED) * 1000, (t) => {
-          r.pos = p0 + dist * easeOutQuad(t)
-          if (i === reels.value.length - 1) {
-            const idx = Math.floor(r.pos)
-            if (idx !== lastIdx) {
-              lastIdx = idx
-              ctx.sfx.tick()
-            }
-          }
-        })
-        .then(() => {
-          r.landed = true
-        })
-    }),
-  )
-  ctx.commit(people, { big: props.prize.count === 1 })
-  phase.value = 'idle'
-  ctx.setBusy(false)
+  revealed.value = winner
+  ctx.commit([winner], { big: props.prize.count === 1 })
 }
 
-function press() {
-  if (phase.value === 'idle') start()
-  else if (phase.value === 'spinning') stop()
+async function chain() {
+  const { ctx } = props
+  while (ctx.remaining() > 0 && ctx.poolSize() > 0) {
+    phase.value = 'chaining'
+    await kit.sleep(1800)
+    spin()
+    await kit.sleep(1000)
+    await land()
+  }
+}
+
+async function press() {
+  const { ctx } = props
+  if (phase.value === 'idle') {
+    if (!ctx.canDraw()) return
+    phase.value = 'spinning'
+    ctx.setBusy(true)
+    spin()
+  } else if (phase.value === 'spinning') {
+    phase.value = 'stopping'
+    await land()
+    if (isAll.value) await chain()
+    phase.value = 'idle'
+    ctx.setBusy(false)
+  }
 }
 
 defineExpose({ press })
 </script>
 
 <template>
-  <div class="flex-1 flex items-center justify-center min-h-0 overflow-y-auto">
-    <div class="flex flex-wrap justify-center gap-4 w-full py-2">
-      <template v-if="reels.length">
-        <div
-          v-for="(r, i) in reels"
-          :key="i"
-          :class="[
-            'slot-window glass-panel rounded-3xl relative overflow-hidden border-2 transition-colors duration-500',
-            sizeClass.box,
-            r.landed
-              ? 'border-yellow-300 shadow-[0_0_40px_rgba(253,224,71,0.45)]'
-              : 'border-white/20',
-          ]"
-        >
-          <div
-            class="absolute inset-x-0 top-0 h-[200%]"
-            :style="{ transform: `translateY(${offsetOf(r)}%)` }"
-          >
-            <div
-              v-for="(name, j) in rowsOf(r)"
-              :key="j"
-              :class="[
-                'h-1/2 flex items-center justify-center font-black tracking-tight whitespace-nowrap px-2',
-                sizeClass.text,
-                r.landed ? 'text-yellow-300 glow-text' : '',
-              ]"
-            >
-              {{ name }}
+  <div class="slot-root flex-1 flex flex-col items-center justify-center gap-[2.5cqw] min-h-0">
+    <div class="reels">
+      <template v-if="reels.length && phase !== 'idle'">
+        <div v-for="(r, i) in reels" :key="i" :class="['reel', r.state]">
+          <div class="strip" :style="{ transform: `translateY(${offsetOf(r)}%)` }">
+            <div v-for="(c, j) in rowsOf(r)" :key="j" :class="['ch', j === 1 ? 'mid' : '']">
+              {{ c }}
             </div>
           </div>
         </div>
       </template>
-      <div
-        v-else
-        :class="[
-          'slot-window glass-panel rounded-3xl flex items-center justify-center border-2 border-white/20',
-          sizeClass.box,
-        ]"
-      >
-        <span
-          :class="[
-            'font-black',
-            sizeClass.text,
-            winners.length ? 'text-yellow-300 glow-text' : 'opacity-20',
-          ]"
+      <template v-else>
+        <div
+          v-for="(c, i) in idleChars"
+          :key="i"
+          :class="['reel', lastWinner || revealed ? 'lock' : '']"
         >
-          {{ idleNames[0] }}
-        </span>
+          <div class="strip">
+            <div class="ch">&nbsp;</div>
+            <div class="ch mid">{{ c }}</div>
+            <div class="ch">&nbsp;</div>
+            <div class="ch">&nbsp;</div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <div class="info">
+      <div v-if="shownPerson" :key="shownPerson.id" class="name">{{ shownPerson.name }}</div>
+      <div v-else-if="matchInfo" class="match">
+        目前符合
+        <b class="mono">{{ matchInfo.prefix }}{{ ' _'.repeat(matchInfo.rest) }}</b>
+        的還有 <b>{{ matchInfo.count }}</b> 人
       </div>
+      <div v-else-if="phase === 'spinning'" class="match">員編轉動中…</div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.slot-window {
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+.slot-root {
+  container-type: inline-size;
+}
+.reels {
+  position: relative;
+  display: flex;
+  gap: 1.3cqw;
+  padding: 1.8cqw 2.2cqw;
+  border-radius: 2cqw;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+}
+.reels::before,
+.reels::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  margin-top: -1.1cqw;
+  border: 1.1cqw solid transparent;
+}
+.reels::before {
+  left: -0.6cqw;
+  border-left: 1.5cqw solid var(--gold);
+}
+.reels::after {
+  right: -0.6cqw;
+  border-right: 1.5cqw solid var(--gold);
+}
+.reel {
+  width: 9.5cqw;
+  height: 16cqw;
+  border-radius: 1.1cqw;
+  border: 1px solid var(--line);
+  background: linear-gradient(transparent, rgba(255, 255, 255, 0.07) 50%, transparent);
+  overflow: hidden;
+  position: relative;
+  transition:
+    border-color 0.3s,
+    background-color 0.3s;
+}
+.strip {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 133.333%;
+}
+.ch {
+  height: 25%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Consolas, 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 3.2cqw;
+  color: rgba(255, 255, 255, 0.18);
+}
+.ch.mid {
+  font-size: 8cqw;
+  color: #fff;
+}
+.reel.spin .ch.mid {
+  filter: blur(0.2cqw);
+  opacity: 0.85;
+}
+.reel.lock {
+  border-color: var(--gold);
+  background-color: var(--gold-soft);
+}
+.reel.lock .ch.mid {
+  color: var(--gold);
+}
+.info {
+  min-height: 8cqw;
+  display: flex;
+  align-items: center;
+}
+.name {
+  font-size: 7.5cqw;
+  font-weight: 900;
+  color: var(--gold);
+  line-height: 1;
+  animation: pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.match {
+  font-size: 1.8cqw;
+  color: var(--muted);
+}
+.match b {
+  color: #fff;
+}
+.mono {
+  font-family: Consolas, monospace;
+  letter-spacing: 0.1em;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.3) translateY(3cqw);
+  }
 }
 </style>

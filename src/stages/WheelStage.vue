@@ -11,22 +11,15 @@ const kit = useStageKit()
 
 const MAX_SECTORS = 12
 const SPEED = 600 // 度 / 秒
-const COLORS = [
-  '#ef4444',
-  '#f59e0b',
-  '#10b981',
-  '#3b82f6',
-  '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
-]
+// 扇區顏色：主題色深淺交錯，中獎扇區為金色（CSS 變數由外層主題提供）
+const sectorFill = (k) =>
+  highlight.value === k ? 'var(--gold)' : k % 2 ? 'var(--accent)' : 'var(--accent-2)'
 
 const phase = ref('idle') // idle | spinning | stopping | chaining
 const sectors = ref([])
 const rot = ref(0)
 const highlight = ref(-1)
-const result = ref('')
+const result = ref(null) // { id, name }
 let stopLoop = null
 
 const angle = computed(() => 360 / Math.max(1, sectors.value.length))
@@ -34,9 +27,7 @@ const fontSize = computed(() =>
   sectors.value.length <= 6 ? 13 : sectors.value.length <= 9 ? 11 : 9,
 )
 const isAll = computed(() => props.prize.mode === 'all' && props.prize.count > 1)
-const shownResult = computed(
-  () => result.value || props.winners[props.winners.length - 1]?.name || '',
-)
+const shownResult = computed(() => result.value || props.winners[props.winners.length - 1] || null)
 
 watchEffect(() => {
   props.ctx.setHint(
@@ -114,7 +105,7 @@ async function land() {
     tickIfCrossed()
   })
   highlight.value = k
-  result.value = winner.name
+  result.value = winner
   ctx.commit([winner], { big: props.prize.count === 1 })
 }
 
@@ -159,13 +150,13 @@ defineExpose({ press })
               v-for="(s, k) in sectors"
               :key="'p' + k"
               :d="sectorPath(k)"
-              :fill="COLORS[k % COLORS.length]"
-              :opacity="highlight < 0 || highlight === k ? 1 : 0.35"
-              stroke="rgba(255,255,255,0.6)"
+              :style="{ fill: sectorFill(k) }"
+              :opacity="highlight < 0 || highlight === k ? 1 : 0.45"
+              stroke="rgba(255,255,255,0.35)"
               stroke-width="0.6"
             />
           </template>
-          <circle v-else r="96" :fill="COLORS[0]" />
+          <circle v-else r="96" :style="{ fill: sectorFill(0) }" />
           <g v-for="(s, k) in sectors" :key="'t' + k" :transform="`rotate(${(k + 0.5) * angle})`">
             <text
               x="0"
@@ -175,7 +166,7 @@ defineExpose({ press })
               dominant-baseline="middle"
               :font-size="fontSize"
               font-weight="900"
-              fill="#fff"
+              :fill="highlight === k ? '#3b2a00' : '#fff'"
               style="paint-order: stroke"
               stroke="rgba(0,0,0,0.35)"
               stroke-width="1.5"
@@ -185,17 +176,24 @@ defineExpose({ press })
           </g>
         </g>
         <circle r="14" fill="#fff" />
-        <circle r="9" fill="#facc15" />
-        <path d="M0 -88 L-9 -106 L9 -106 Z" fill="#facc15" stroke="#fff" stroke-width="1.5" />
+        <circle r="9" style="fill: var(--gold)" />
+        <path
+          d="M0 -88 L-9 -106 L9 -106 Z"
+          style="fill: var(--gold)"
+          stroke="#fff"
+          stroke-width="1.5"
+        />
       </svg>
     </div>
     <div class="text-center min-w-[30%]">
       <div
         v-if="shownResult && phase !== 'spinning'"
-        :key="shownResult"
-        class="text-[clamp(2.5rem,7vw,6rem)] font-black text-yellow-300 glow-text tracking-tight pop-in"
+        :key="shownResult.id"
+        class="result-card pop-in"
       >
-        {{ shownResult }}
+        <div class="result-lbl">恭喜中獎</div>
+        <div class="result-name">{{ shownResult.name }}</div>
+        <div v-if="shownResult.id" class="result-id">{{ shownResult.id }}</div>
       </div>
       <div v-else class="text-4xl opacity-10 font-black tracking-[1rem]">
         {{ phase === 'spinning' ? '…' : 'READY' }}
@@ -205,6 +203,30 @@ defineExpose({ press })
 </template>
 
 <style scoped>
+.result-card {
+  display: inline-block;
+  text-align: left;
+  padding: 1.2rem 2rem;
+  border-radius: 1.2rem;
+  background: var(--gold-soft);
+  border: 1px solid var(--gold-line);
+}
+.result-lbl {
+  font-size: clamp(0.8rem, 1.1vw, 1.3rem);
+  letter-spacing: 0.25em;
+  color: var(--muted);
+}
+.result-name {
+  font-size: clamp(2.5rem, 6vw, 6.5rem);
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--gold);
+}
+.result-id {
+  font-family: Consolas, monospace;
+  font-size: clamp(0.9rem, 1.4vw, 1.6rem);
+  color: var(--muted);
+}
 .pop-in {
   animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }

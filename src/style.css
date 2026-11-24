@@ -13,14 +13,226 @@ html {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background-color: #0d0d0d;
+  background-color: #0b0d14;
   font-family:
-    'Inter',
+    'Microsoft JhengHei',
+    'PingFang TC',
+    'Noto Sans TC',
     -apple-system,
-    BlinkMacSystemFont,
     'Segoe UI',
-    Roboto,
     sans-serif;
+}
+
+/* ===== 色彩系統 ===== */
+:root {
+  --accent: #e23d3d;
+  --accent-2: #7f1d1d;
+  --gold: #f5c542;
+  --gold-soft: rgba(245, 197, 66, 0.16);
+  --gold-line: rgba(245, 197, 66, 0.55);
+  --ink: #0b0d14;
+  --line: rgba(255, 255, 255, 0.1);
+  --muted: rgba(245, 246, 250, 0.6);
+}
+.app-bg {
+  background-color: var(--ink);
+  background-image:
+    radial-gradient(
+      120% 70% at 50% -10%,
+      color-mix(in srgb, var(--accent) 40%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      80% 60% at 50% 120%,
+      color-mix(in srgb, var(--accent-2) 35%, transparent),
+      transparent 70%
+    );
+}
+.text-gold {
+  color: var(--gold);
+}
+
+/* ===== 抽獎畫面版面 ===== */
+.lt-screen {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+}
+.lt-top {
+  display: flex;
+  align-items: center;
+  gap: 2.5vw;
+  padding: clamp(12px, 1.8vw, 36px) clamp(16px, 3.5vw, 64px);
+  padding-right: calc(clamp(16px, 3.5vw, 64px) + 48px);
+  border-bottom: 1px solid var(--line);
+}
+.lt-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 1.6vw;
+}
+.lt-tier {
+  flex-shrink: 0;
+  font-size: clamp(14px, 1.7vw, 30px);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  padding: 0.25em 1em;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, white);
+}
+.lt-reward {
+  font-size: clamp(28px, 4.4vw, 84px);
+  font-weight: 900;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lt-tag {
+  flex-shrink: 0;
+  font-size: clamp(11px, 1vw, 18px);
+  font-weight: 700;
+  padding: 0.2em 0.8em;
+  border-radius: 999px;
+  color: var(--gold);
+  border: 1px solid var(--gold-line);
+}
+.lt-count {
+  text-align: right;
+}
+.lt-count-lbl {
+  font-size: clamp(11px, 1.1vw, 20px);
+  color: var(--muted);
+  letter-spacing: 0.15em;
+}
+.lt-count-num {
+  font-size: clamp(32px, 4.8vw, 92px);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.lt-count-num small {
+  font-size: 0.42em;
+  color: var(--muted);
+}
+.lt-navs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lt-navs button {
+  width: clamp(24px, 2vw, 36px);
+  height: clamp(24px, 2vw, 36px);
+  border-radius: 999px;
+  font-size: clamp(16px, 1.4vw, 24px);
+  line-height: 1;
+  opacity: 0.25;
+  transition:
+    opacity 0.2s,
+    background 0.2s;
+}
+.lt-navs button:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+.lt-navs button:disabled {
+  opacity: 0.08;
+  cursor: not-allowed;
+}
+.lt-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: clamp(8px, 1.4vw, 28px) clamp(16px, 3vw, 56px);
+}
+.lt-bottom {
+  display: flex;
+  align-items: center;
+  gap: 2vw;
+  padding: clamp(8px, 1vw, 20px) clamp(16px, 3.5vw, 64px);
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.25);
+  min-height: clamp(64px, 8vw, 150px);
+}
+.lt-ribbon {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+}
+.lt-ribbon-lbl {
+  writing-mode: vertical-rl;
+  font-size: clamp(11px, 0.9vw, 16px);
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+.lt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8vw;
+  max-height: clamp(56px, 7.5vw, 140px);
+  overflow-y: auto;
+}
+.lt-chip {
+  padding: 0.35em 1.1em;
+  border-radius: 0.6em;
+  background: var(--gold-soft);
+  border: 1px solid var(--gold-line);
+  text-align: center;
+  white-space: nowrap;
+  font-size: clamp(12px, 1.1vw, 22px);
+}
+.lt-chip b {
+  display: block;
+  font-size: 1.6em;
+  color: var(--gold);
+  line-height: 1.2;
+}
+.lt-chip span {
+  color: var(--muted);
+  font-family: Consolas, 'Courier New', monospace;
+}
+.lt-chip-empty {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--line);
+  color: var(--muted);
+  padding: 0.9em 1.6em;
+}
+.lt-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  flex-shrink: 0;
+  font-size: clamp(13px, 1.25vw, 24px);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lt-kbd {
+  font-weight: 700;
+  color: #fff;
+  padding: 0.2em 0.8em;
+  border-radius: 0.4em;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-bottom-width: 0.25em;
+}
+.lt-redraw {
+  flex-shrink: 0;
+  font-size: clamp(11px, 0.9vw, 16px);
+  font-weight: 700;
+  color: #fca5a5;
+  padding: 0.3em 1em;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.lt-redraw:hover {
+  opacity: 1;
 }
 
 /* 玻璃擬態效果 */
@@ -86,4 +298,59 @@ html {
 .toast-leave-to {
   opacity: 0;
   transform: translate(-50%, -16px);
+}
+
+/* 參與人員名單：附行號的編輯框 */
+.list-editor {
+  display: flex;
+  height: 16rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: Consolas, 'Courier New', 'Microsoft JhengHei', monospace;
+  font-size: 14px;
+  line-height: 22px;
+}
+.list-editor:focus-within {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.list-editor.has-error {
+  border-color: rgba(248, 113, 113, 0.6);
+}
+.list-editor.locked {
+  border-color: rgba(255, 255, 255, 0.05);
+  opacity: 0.6;
+}
+.list-gutter {
+  flex-shrink: 0;
+  min-width: 3.4em;
+  padding: 16px 8px 16px 0;
+  overflow: hidden;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.list-gutter .err {
+  color: #fca5a5;
+  font-weight: 700;
+  background: rgba(248, 113, 113, 0.18);
+}
+.list-text {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 16px 16px 12px;
+  background: transparent;
+  outline: none;
+  resize: none;
+  white-space: pre;
+  overflow: auto;
+  font: inherit;
+  line-height: inherit;
+}
+.list-editor.locked .list-text {
+  cursor: not-allowed;
 }
