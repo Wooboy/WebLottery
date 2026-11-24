@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>專業抽獎系統 V2.0</title>
+    <title>專業抽獎系統</title>
   </head>
   <body class="bg-black text-white antialiased">
     <div id="app" v-cloak>
@@ -13,15 +13,47 @@
       >
         <!-- 獎項背景圖 -->
         <div
-          v-if="currentView === 'lottery' && activePrize"
+          v-if="isPresenting && activePrize"
           class="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none transition-all duration-1000"
           :style="{ backgroundImage: activePrize.bgUrl ? `url(${activePrize.bgUrl})` : '' }"
         ></div>
 
+        <!-- 上方選單（一般模式）：設定 / 中獎清單，進入全螢幕開始抽獎 -->
+        <header
+          v-if="!isPresenting"
+          class="relative z-20 shrink-0 flex flex-wrap items-center gap-3 px-6 py-4 border-b border-white/10 bg-black/20 backdrop-blur"
+        >
+          <div class="font-black text-lg tracking-wide mr-2">🎉 抽獎系統</div>
+          <nav class="flex gap-2">
+            <button
+              v-for="tab in tabs"
+              :key="tab.id"
+              @click="changeTab(tab.id)"
+              :class="['px-5 py-2 rounded-full font-bold text-sm transition',
+                currentView === tab.id ? 'bg-white text-black' : 'text-white/60 hover:text-white hover:bg-white/10']"
+            >
+              {{ tab.name }}
+              <span
+                v-if="tab.id === 'results' && state.results.length"
+                class="ml-1 text-xs opacity-60"
+                >({{ state.results.length }})</span
+              >
+            </button>
+          </nav>
+          <button
+            @click="enterPresentation"
+            title="進入全螢幕抽獎 (F)"
+            class="ml-auto px-6 py-2.5 rounded-full font-black bg-yellow-400 text-black hover:bg-yellow-300 shadow-lg transition"
+          >
+            ▶ 開始抽獎
+            <span class="ml-1 text-xs font-bold opacity-60 border border-black/30 rounded px-1">F</span>
+          </button>
+        </header>
+
         <!-- 頁面：設定 (Settings) -->
         <main
-          v-if="currentView === 'settings'"
-          class="flex-1 overflow-y-auto p-6 pb-40 relative z-10 scroll-container"
+          v-if="!isPresenting && currentView === 'settings'"
+          class="flex-1 overflow-y-auto p-6 pb-12 relative z-10 scroll-container"
         >
           <div class="max-w-6xl mx-auto space-y-6">
             <h2 class="text-3xl font-black border-b border-white/20 pb-4 italic">
@@ -53,6 +85,21 @@
                   </div>
                 </div>
                 <div>
+                  <h3 class="font-bold mb-3">🔊 現場效果</h3>
+                  <div class="flex flex-wrap gap-6 text-sm">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" v-model="state.config.sound" /> 音效
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" v-model="state.config.effects" /> 中獎彩帶特效
+                    </label>
+                  </div>
+                  <p class="text-[11px] mt-3 opacity-50 leading-relaxed">
+                    ⌨️ 按 [F] 或右上角「開始抽獎」進入全螢幕抽獎；抽獎中 [空白鍵] / [Enter]
+                    抽獎、[PageUp] / [PageDown] 切換獎項、[F] / [Esc] 離開（簡報筆可直接使用）
+                  </p>
+                </div>
+                <div>
                   <h3 class="font-bold mb-2">📥 獎項 CSV 匯入</h3>
                   <div class="bg-white/5 p-4 rounded-xl border border-white/10">
                     <input
@@ -62,7 +109,7 @@
                       class="text-xs w-full cursor-pointer"
                     />
                     <p class="text-[10px] mt-2 opacity-50 italic">
-                      CSV 格式：獎項名稱, 獎品, 數量, 背景圖片URL, 允許重複中獎(Y/N，可省略)
+                      CSV 格式：獎項名稱, 獎品, 數量, 背景圖片URL, 允許重複中獎(Y/N), 動畫樣式（後兩欄可省略）
                     </p>
                   </div>
                 </div>
@@ -99,7 +146,7 @@
                   + 新增獎項
                 </button>
               </div>
-              <table class="w-full text-left min-w-[850px]">
+              <table class="w-full text-left min-w-[1000px]">
                 <thead
                   class="text-xs opacity-40 border-b border-white/10 uppercase tracking-widest"
                 >
@@ -108,6 +155,7 @@
                     <th class="pb-3 w-24 text-center">數量</th>
                     <th class="pb-3 w-64">抽獎模式 (多人時)</th>
                     <th class="pb-3 w-32 text-center">允許重複中獎</th>
+                    <th class="pb-3 w-36">動畫樣式</th>
                     <th class="pb-3">背景圖 URL</th>
                     <th class="pb-3 w-12"></th>
                   </tr>
@@ -151,6 +199,16 @@
                         {{ p.allowRepeat ? '可重複' : '不重複' }}
                       </label>
                     </td>
+                    <td class="pr-4">
+                      <select
+                        v-model="p.style"
+                        class="bg-black/30 border border-white/15 rounded-lg px-2 py-1 text-xs outline-none focus:border-white/50"
+                      >
+                        <option v-for="st in stages" :key="st.key" :value="st.key">
+                          {{ st.label }}
+                        </option>
+                      </select>
+                    </td>
                     <td>
                       <input
                         v-model="p.bgUrl"
@@ -172,18 +230,21 @@
           </div>
         </main>
 
-        <!-- 頁面：抽獎 (Lottery) -->
+        <!-- 頁面：抽獎（全螢幕抽獎模式） -->
         <main
-          v-if="currentView === 'lottery'"
-          class="flex-1 flex flex-col p-8 relative z-10 overflow-hidden"
+          v-if="isPresenting"
+          class="flex-1 flex flex-col p-6 relative z-10 overflow-hidden"
         >
-          <div v-if="activePrize" class="flex flex-col h-full max-w-6xl mx-auto w-full">
+          <div v-if="activePrize" class="flex flex-col h-full max-w-6xl mx-auto w-full min-h-0">
             <div
-              class="glass-panel p-8 rounded-[3rem] flex items-center justify-between mb-8 shadow-2xl relative"
+              class="glass-panel p-6 rounded-[3rem] flex items-center justify-between mb-4 shadow-2xl relative shrink-0"
             >
               <button
                 @click="prevPrize"
-                class="w-14 h-14 rounded-full hover:bg-white/10 text-3xl transition"
+                :disabled="isBusy"
+                aria-label="上一個獎項"
+                title="上一個獎項 (PageUp)"
+                class="w-14 h-14 rounded-full hover:bg-white/10 text-3xl transition disabled:opacity-20 disabled:cursor-not-allowed"
               >
                 ❮
               </button>
@@ -205,39 +266,37 @@
                 >
                   可重複中獎
                 </div>
+                <div
+                  class="mt-4 ml-2 inline-block px-4 py-1 bg-white/5 rounded-full text-sm font-bold border border-white/15 opacity-70"
+                >
+                  🎲 {{ stageOf(activePrize.style).label }}
+                </div>
               </div>
               <button
                 @click="nextPrize"
-                class="w-14 h-14 rounded-full hover:bg-white/10 text-3xl transition"
+                :disabled="isBusy"
+                aria-label="下一個獎項"
+                title="下一個獎項 (PageDown)"
+                class="w-14 h-14 rounded-full hover:bg-white/10 text-3xl transition disabled:opacity-20 disabled:cursor-not-allowed"
               >
                 ❯
               </button>
             </div>
 
-            <div class="flex-1 flex items-center justify-center">
-              <div
-                v-if="isSpinning"
-                class="name-display font-black glow-text opacity-90 tracking-tighter"
-              >
-                {{ spinningName }}
-              </div>
-              <div
-                v-else-if="currentWinners.length === 0"
-                class="text-5xl opacity-10 font-black tracking-[1.5rem]"
-              >
-                READY
-              </div>
-              <div
-                v-else
-                class="name-display font-black text-yellow-300 glow-text animate-pulse tracking-tighter"
-              >
-                {{ spinningName }}
-              </div>
-            </div>
+            <!-- 抽獎舞台：依獎項設定的動畫樣式切換 -->
+            <component
+              :is="stageComponent"
+              :key="stageKey"
+              ref="stageRef"
+              :ctx="ctx"
+              :prize="activePrize"
+              :pool="availablePool"
+              :winners="currentWinnerNames"
+            ></component>
 
-            <div class="mt-4 flex flex-col items-center gap-6">
+            <div class="mt-4 flex flex-col items-center gap-4 shrink-0">
               <div
-                class="w-full glass-panel rounded-[2.5rem] p-6 min-h-[160px] max-h-[300px] overflow-y-auto shadow-inner"
+                class="w-full glass-panel rounded-[2.5rem] p-4 min-h-[90px] max-h-[22vh] overflow-y-auto shadow-inner"
               >
                 <transition-group name="list" tag="div" class="flex flex-wrap justify-center gap-3">
                   <div
@@ -250,15 +309,14 @@
                 </transition-group>
               </div>
 
-              <div class="text-center pb-20">
+              <div class="text-center pb-1">
                 <p
                   class="text-white/40 uppercase tracking-[0.4em] text-sm font-bold animate-pulse mb-3"
                 >
-                  {{ isSpinning ? (activePrize.mode === 'single' ? '按 [空白鍵] 抽出下一位' :
-                  '按[空白鍵] 揭曉全部') : '按 [空白鍵] 開始抽獎' }}
+                  {{ hint }}
                 </p>
                 <button
-                  v-if="!isSpinning && currentWinners.length > 0"
+                  v-if="!isBusy && currentWinners.length > 0"
                   @click="confirmRedraw"
                   class="text-xs font-bold text-red-400 hover:text-red-300 px-4 py-1 border border-red-500/30 rounded-full transition"
                 >
@@ -275,10 +333,31 @@
           </div>
         </main>
 
+        <!-- 離開抽獎模式 -->
+        <button
+          v-if="isPresenting"
+          @click="exitPresentation"
+          title="離開抽獎 (F / Esc)"
+          aria-label="離開抽獎"
+          class="fixed top-4 right-4 z-50 w-11 h-11 rounded-full glass-panel text-lg opacity-20 hover:opacity-100 transition"
+        >
+          ✕
+        </button>
+
+        <!-- 提示訊息（取代 alert，避免中斷全螢幕） -->
+        <transition name="toast">
+          <div
+            v-if="toast"
+            class="fixed top-6 left-1/2 -translate-x-1/2 z-[2500] px-8 py-3 rounded-2xl bg-black/80 border border-white/20 font-bold shadow-2xl"
+          >
+            {{ toast }}
+          </div>
+        </transition>
+
         <!-- 頁面：結果 (Results) -->
         <main
-          v-if="currentView === 'results'"
-          class="flex-1 overflow-y-auto p-8 pb-40 relative z-10 scroll-container"
+          v-if="!isPresenting && currentView === 'results'"
+          class="flex-1 overflow-y-auto p-8 pb-12 relative z-10 scroll-container"
         >
           <div class="max-w-5xl mx-auto space-y-6">
             <div class="flex justify-between items-center border-b border-white/20 pb-4">
@@ -320,34 +399,6 @@
           </div>
         </main>
 
-        <!-- 底部功能選單 (固定) -->
-        <nav
-          :class="['nav-drawer glass-panel rounded-t-[40px] p-2 flex flex-col items-center shadow-2xl', isNavExpanded ? 'active' : '']"
-        >
-          <button
-            @click="isNavExpanded = !isNavExpanded"
-            class="w-full py-4 flex flex-col items-center group outline-none"
-          >
-            <div
-              class="w-12 h-1.5 bg-white/20 rounded-full group-hover:bg-white/50 transition-colors"
-            ></div>
-            <span
-              class="text-[10px] mt-1 opacity-0 group-hover:opacity-100 transition-opacity tracking-widest uppercase"
-              >Menu</span
-            >
-          </button>
-          <div class="flex w-full gap-2 p-2 pb-6">
-            <button
-              v-for="tab in tabs"
-              :key="tab.id"
-              @click="changeTab(tab.id)"
-              :class="['flex-1 py-4 rounded-3xl font-black transition-all text-sm uppercase tracking-widest', 
-                        currentView === tab.id ? 'bg-white text-black shadow-inner' : 'text-white/40 hover:text-white hover:bg-white/5']"
-            >
-              {{ tab.name }}
-            </button>
-          </div>
-        </nav>
       </div>
     </div>
 
