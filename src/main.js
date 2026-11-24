@@ -23,7 +23,9 @@ createApp({
     // 預設資料結構
     const defaultState = {
       rawParticipants: '',
-      prizes: [{ name: '壹等獎', reward: '神秘獎品', count: 1, mode: 'single', bgUrl: '' }],
+      prizes: [
+        { name: '壹等獎', reward: '神秘獎品', count: 1, mode: 'single', bgUrl: '', allowRepeat: false },
+      ],
       results: [],
       config: { theme: 'red' },
       currentIndex: 0,
@@ -69,12 +71,31 @@ createApp({
         .filter((s) => s !== ''),
     )
 
-    const availablePool = computed(() => {
-      const winners = state.results.map((r) => r.winner)
-      return participantsAll.value.filter((p) => !winners.includes(p))
-    })
-
     const activePrize = computed(() => state.prizes[state.currentIndex] || null)
+
+    // 目前獎項的可抽名單：
+    // - 同一獎項內一律不重複中獎
+    // - 「不允許重複中獎」的獎項：另外排除中過其他「不允許重複」獎項的人
+    // - 「允許重複中獎」的獎項：從全部名單抽（僅排除本獎項已中獎者）
+    // - 中過「允許重複」獎項的人，不影響其他獎項的抽獎資格
+    // （找不到對應獎項的舊紀錄，視為不允許重複，保守排除）
+    const availablePool = computed(() => {
+      const prize = activePrize.value
+      if (!prize) return []
+      const repeatPrizeNames = new Set(
+        state.prizes.filter((p) => p.allowRepeat).map((p) => p.name),
+      )
+      const excluded = new Set(
+        state.results
+          .filter(
+            (r) =>
+              r.prizeName === prize.name ||
+              (!prize.allowRepeat && !repeatPrizeNames.has(r.prizeName)),
+          )
+          .map((r) => r.winner),
+      )
+      return participantsAll.value.filter((p) => !excluded.has(p))
+    })
 
     const currentWinners = computed(() => {
       if (!activePrize.value) return []
@@ -215,8 +236,16 @@ createApp({
         const lines = ev.target.result.split(/\r?\n/).filter((l) => l.trim())
         if (lines.length > 1) {
           state.prizes = lines.slice(1).map((l) => {
-            const [name, reward, count, bgUrl] = l.split(',').map((s) => s.trim())
-            return { name, reward, count: parseInt(count) || 1, mode: 'single', bgUrl: bgUrl || '' }
+            const [name, reward, count, bgUrl, repeat] = l.split(',').map((s) => s.trim())
+            return {
+              name,
+              reward,
+              count: parseInt(count) || 1,
+              mode: 'single',
+              bgUrl: bgUrl || '',
+              // 第 5 欄「允許重複中獎」：Y / 1 / 是 / true 視為允許
+              allowRepeat: /^(y|yes|1|true|是)$/i.test(repeat || ''),
+            }
           })
           state.currentIndex = 0
           alert('匯入獎項成功！')
@@ -232,8 +261,21 @@ createApp({
       }
     }
 
+    function clearResults() {
+      if (state.results.length === 0) return alert('目前尚無中獎紀錄')
+      if (
+        confirm(
+          `確定要清空全部 ${state.results.length} 筆中獎紀錄嗎？\n名單、獎項與設定會保留，所有人員回到可抽狀態。此動作無法復原！`,
+        )
+      ) {
+        if (isSpinning.value) stopSpinning()
+        state.results = []
+        spinningName.value = ''
+      }
+    }
+
     function resetSystem() {
-      if (confirm('🚨 確定要刪除所有資料（名單、紀錄、設定）嗎？這將無法復原！')) {
+      if (confirm('🚨 確定要全部重設嗎？\n將刪除參與名單、獎項設定、中獎紀錄與色系，此動作無法復原！')) {
         // 只刪除本系統的存檔，避免清掉同源（例如所有本機 file:// 頁面）其他程式的資料
         localStorage.removeItem(STORAGE_KEY)
         location.reload()
@@ -241,7 +283,14 @@ createApp({
     }
 
     function addPrize() {
-      state.prizes.push({ name: '新獎項', reward: '', count: 1, mode: 'single', bgUrl: '' })
+      state.prizes.push({
+        name: '新獎項',
+        reward: '',
+        count: 1,
+        mode: 'single',
+        bgUrl: '',
+        allowRepeat: false,
+      })
     }
 
     function exportCSV() {
@@ -280,6 +329,7 @@ createApp({
       prevPrize,
       nextPrize,
       resetSystem,
+      clearResults,
       addPrize,
       exportCSV,
     }

@@ -62,16 +62,30 @@
                       class="text-xs w-full cursor-pointer"
                     />
                     <p class="text-[10px] mt-2 opacity-50 italic">
-                      CSV 格式：獎項名稱, 獎品, 數量, 背景圖片URL
+                      CSV 格式：獎項名稱, 獎品, 數量, 背景圖片URL, 允許重複中獎(Y/N，可省略)
                     </p>
                   </div>
                 </div>
-                <button
-                  @click="resetSystem"
-                  class="w-full py-4 bg-red-600/40 hover:bg-red-600 rounded-2xl font-black transition-colors border border-red-500/50"
-                >
-                  🚨 重設系統資料
-                </button>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    @click="clearResults"
+                    class="w-full py-4 bg-amber-600/30 hover:bg-amber-600 rounded-2xl font-black transition-colors border border-amber-500/50"
+                  >
+                    🧹 清空中獎名單
+                    <span class="block text-[10px] font-normal opacity-70 mt-1"
+                      >保留名單與獎項設定</span
+                    >
+                  </button>
+                  <button
+                    @click="resetSystem"
+                    class="w-full py-4 bg-red-600/40 hover:bg-red-600 rounded-2xl font-black transition-colors border border-red-500/50"
+                  >
+                    🚨 全部重設
+                    <span class="block text-[10px] font-normal opacity-70 mt-1"
+                      >名單、獎項、紀錄、設定全部刪除</span
+                    >
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -93,6 +107,7 @@
                     <th class="pb-3">名稱 / 獎品</th>
                     <th class="pb-3 w-24 text-center">數量</th>
                     <th class="pb-3 w-64">抽獎模式 (多人時)</th>
+                    <th class="pb-3 w-32 text-center">允許重複中獎</th>
                     <th class="pb-3">背景圖 URL</th>
                     <th class="pb-3 w-12"></th>
                   </tr>
@@ -126,6 +141,15 @@
                         >
                       </div>
                       <span v-else class="text-xs opacity-30 italic">自動單抽</span>
+                    </td>
+                    <td class="text-center">
+                      <label
+                        class="inline-flex items-center gap-1 text-xs cursor-pointer hover:text-white"
+                        title="勾選：從全部名單抽（已中過其他獎項者也可抽）；不勾：排除已中過一般獎項的人"
+                      >
+                        <input type="checkbox" v-model="p.allowRepeat" />
+                        {{ p.allowRepeat ? '可重複' : '不重複' }}
+                      </label>
                     </td>
                     <td>
                       <input
@@ -174,6 +198,12 @@
                   class="mt-4 inline-block px-6 py-1 bg-white/10 rounded-full text-sm font-bold border border-white/20"
                 >
                   剩餘：{{ remainingCount(activePrize.name) }} / {{ activePrize.count }}
+                </div>
+                <div
+                  v-if="activePrize.allowRepeat"
+                  class="mt-4 ml-2 inline-block px-4 py-1 bg-amber-400/20 rounded-full text-sm font-bold border border-amber-300/40 text-amber-200"
+                >
+                  可重複中獎
                 </div>
               </div>
               <button
