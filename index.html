@@ -180,7 +180,7 @@
                   + 新增獎項
                 </button>
               </div>
-              <table class="w-full text-left min-w-[1000px]">
+              <table class="w-full text-left min-w-[1100px]">
                 <thead
                   class="text-xs opacity-40 border-b border-white/10 uppercase tracking-widest"
                 >
@@ -189,7 +189,7 @@
                     <th class="pb-3 w-24 text-center">數量</th>
                     <th class="pb-3 w-64">抽獎模式 (多人時)</th>
                     <th class="pb-3 w-32 text-center">允許重複中獎</th>
-                    <th class="pb-3 w-36">動畫樣式</th>
+                    <th class="pb-3 w-56">動畫樣式</th>
                     <th class="pb-3">背景圖 URL</th>
                     <th class="pb-3 w-12"></th>
                   </tr>
@@ -233,7 +233,7 @@
                         {{ p.allowRepeat ? '可重複' : '不重複' }}
                       </label>
                     </td>
-                    <td class="pr-4">
+                    <td class="pr-4 whitespace-nowrap">
                       <select
                         v-model="p.style"
                         class="bg-black/30 border border-white/15 rounded-lg px-2 py-1 text-xs outline-none focus:border-white/50"
@@ -242,6 +242,13 @@
                           {{ st.label }}
                         </option>
                       </select>
+                      <button
+                        @click="openPreview(i)"
+                        title="模擬此獎項的抽獎畫面（不會記錄）"
+                        class="ml-2 text-xs font-bold px-3 py-1 rounded-full bg-white/15 hover:bg-white/30 transition"
+                      >
+                        👁 預覽
+                      </button>
                     </td>
                     <td>
                       <input
@@ -380,6 +387,98 @@
         >
           ✕
         </button>
+
+        <!-- 抽獎動畫預覽（模擬，不記錄） -->
+        <div
+          v-if="previewPrize"
+          class="fixed inset-0 z-[2000] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          @click.self="closePreview"
+        >
+          <div
+            :class="['relative w-full max-w-6xl h-[88vh] rounded-[2rem] border border-white/20 shadow-2xl overflow-hidden flex flex-col bg-gradient-to-br', themeClasses[state.config.theme]?.grad || 'from-zinc-900 to-black']"
+          >
+            <div
+              class="shrink-0 flex flex-wrap items-center gap-3 px-6 py-3 border-b border-white/10 bg-black/30"
+            >
+              <span
+                class="text-[11px] font-black px-3 py-1 rounded-full bg-amber-400 text-black tracking-widest"
+                >預覽模式</span
+              >
+              <span class="font-black text-lg">{{ previewPrize.name }}</span>
+              <select
+                v-model="previewPrize.style"
+                @change="$event.target.blur()"
+                class="bg-black/40 border border-white/20 rounded-lg px-2 py-1 text-sm outline-none"
+                title="切換動畫樣式（會同步更新獎項設定）"
+              >
+                <option v-for="st in stages" :key="st.key" :value="st.key">{{ st.label }}</option>
+              </select>
+              <span class="text-xs opacity-60">
+                {{ previewPrize.count }} 名 ·
+                {{ previewPrize.count > 1 ? (previewPrize.mode === 'all' ? '一次抽完' : '連續單抽') : '單抽' }}
+                · 剩 {{ Math.max(0, previewPrize.count - previewWinners.length) }} 名
+              </span>
+              <div class="ml-auto flex gap-2">
+                <button
+                  @click="resetPreview"
+                  class="text-xs font-bold px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/30 transition"
+                >
+                  ↺ 重新模擬
+                </button>
+                <button
+                  @click="closePreview"
+                  class="text-xs font-bold px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/30 transition"
+                >
+                  ✕ 關閉 (Esc)
+                </button>
+              </div>
+            </div>
+            <p class="shrink-0 text-[11px] text-center py-1.5 bg-amber-400/10 text-amber-100/80">
+              模擬抽獎，結果不會寫入中獎紀錄
+              <template v-if="previewUsesDemo">｜參與名單尚未輸入或格式有誤，使用 30 位示範人員</template>
+              <template v-else>｜使用目前參與名單（{{ previewPool.length + previewWinners.length }} 位）</template>
+            </p>
+
+            <div class="flex-1 min-h-0 flex flex-col p-5">
+              <component
+                :is="previewStageComponent"
+                :key="previewKey"
+                ref="previewStageRef"
+                :ctx="previewCtx"
+                :prize="previewPrize"
+                :pool="previewPool"
+                :winners="previewWinners"
+              ></component>
+            </div>
+
+            <div class="shrink-0 px-5 pb-4 flex flex-col items-center gap-3">
+              <div
+                class="w-full min-h-[56px] max-h-[16vh] overflow-y-auto rounded-2xl bg-white/5 border border-white/10 p-2 flex flex-wrap justify-center gap-2"
+              >
+                <div
+                  v-for="w in previewWinners"
+                  :key="w.id"
+                  class="px-4 py-1 rounded-xl bg-white/15 text-yellow-300 font-black text-center leading-tight"
+                >
+                  {{ w.name }}
+                  <div class="text-[10px] font-mono opacity-50 font-normal">{{ w.id }}</div>
+                </div>
+                <span v-if="!previewWinners.length" class="self-center text-xs opacity-30"
+                  >模擬中獎者會顯示在這裡</span
+                >
+              </div>
+              <div class="flex items-center gap-4">
+                <span class="text-white/50 text-xs tracking-[0.3em] font-bold">{{ previewHint }}</span>
+                <button
+                  @click="previewPress"
+                  class="px-6 py-2 rounded-full font-black bg-yellow-400 text-black hover:bg-yellow-300 transition"
+                >
+                  ▶ 模擬按下空白鍵
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- 提示訊息（取代 alert，避免中斷全螢幕） -->
         <transition name="toast">

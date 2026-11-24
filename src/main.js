@@ -171,33 +171,53 @@ createApp({
       toastTimer = setTimeout(() => (toast.value = ''), 2500)
     }
 
-    let drawCounter = 0
-    // 提供給各抽獎舞台的抽獎引擎：
+    // 建立提供給抽獎舞台的抽獎引擎（正式抽獎與設定頁預覽共用）：
     // 中獎者一律由 decide() 以安全亂數從「當下可用名單」抽出，動畫只負責呈現；
-    // 動畫結束後才以 commit() 寫入紀錄（中途切換獎項 / 頁面則不記錄）
-    const ctx = markRaw({
-      sfx,
+    // 動畫結束後才以 commit() 交給 record() 記錄（中途切換獎項 / 頁面則不記錄）
+    function makeDrawEngine({ prize, pool, remaining, record, onBusy, onHint }) {
+      const engine = markRaw({
+        sfx,
+        remaining,
+        poolSize: () => pool().length,
+        // 本回合要抽的人數：一次抽完 = 剩餘名額；連續單抽 = 1
+        roundSize() {
+          const r = engine.remaining()
+          const p = engine.poolSize()
+          return prize()?.mode === 'all' ? Math.min(r, p) : Math.min(1, r, p)
+        },
+        canDraw() {
+          if (engine.remaining() <= 0) {
+            notify('此獎項名額已滿！')
+            return false
+          }
+          if (engine.poolSize() === 0) {
+            notify('可用人員名單已空！')
+            return false
+          }
+          return true
+        },
+        decide: (n) => sample(pool(), n),
+        commit(people, { big = false } = {}) {
+          record(people)
+          if (!people.length) return
+          if (state.config.effects !== false) confetti({ big })
+          big ? sfx.bigWin() : sfx.win()
+          if (engine.remaining() > 0 && engine.poolSize() === 0) {
+            notify('可用人員名單已空，無法再抽！')
+          }
+        },
+        setBusy: onBusy,
+        setHint: onHint,
+      })
+      return engine
+    }
+
+    let drawCounter = 0
+    const ctx = makeDrawEngine({
+      prize: () => activePrize.value,
+      pool: () => availablePool.value,
       remaining: () => (activePrize.value ? remainingCount(activePrize.value.name) : 0),
-      poolSize: () => availablePool.value.length,
-      // 本回合要抽的人數：一次抽完 = 剩餘名額；連續單抽 = 1
-      roundSize() {
-        const r = ctx.remaining()
-        const p = ctx.poolSize()
-        return activePrize.value?.mode === 'all' ? Math.min(r, p) : Math.min(1, r, p)
-      },
-      canDraw() {
-        if (ctx.remaining() <= 0) {
-          notify('此獎項名額已滿！')
-          return false
-        }
-        if (ctx.poolSize() === 0) {
-          notify('可用人員名單已空！')
-          return false
-        }
-        return true
-      },
-      decide: (n) => sample(availablePool.value, n),
-      commit(people, { big = false } = {}) {
+      record(people) {
         const timestamp = Date.now()
         for (const person of people) {
           state.results.push({
@@ -208,18 +228,80 @@ createApp({
             seed: timestamp,
           })
         }
-        if (!people.length) return
-        if (state.config.effects !== false) confetti({ big })
-        big ? sfx.bigWin() : sfx.win()
-        if (ctx.remaining() > 0 && ctx.poolSize() === 0) notify('可用人員名單已空，無法再抽！')
       },
-      setBusy(b) {
-        isBusy.value = b
-      },
-      setHint(text) {
-        hint.value = text
-      },
+      onBusy: (b) => (isBusy.value = b),
+      onHint: (t) => (hint.value = t),
     })
+
+    // --- 抽獎動畫預覽（設定頁）---
+    // 以獎項的實際設定（動畫樣式、名額、抽獎模式）模擬抽獎，結果只存在預覽視窗，不寫入中獎紀錄。
+    // 名單：使用已輸入的參與人員（忽略正式中獎紀錄）；尚未輸入或格式有誤時使用示範名單。
+    const DEMO_PEOPLE = Array.from({ length: 30 }, (_, i) => ({
+      id: `DEMO${String(i + 1).padStart(2, '0')}`,
+      name: `示範人員 ${String(i + 1).padStart(2, '0')}`,
+    }))
+    const previewIndex = ref(-1)
+    const previewWinners = ref([])
+    const previewEpoch = ref(0)
+    const previewBusy = ref(false)
+    const previewHint = ref('')
+    const previewStageRef = ref(null)
+
+    const previewPrize = computed(() => state.prizes[previewIndex.value] || null)
+    const previewUsesDemo = computed(
+      () => participantsAll.value.length === 0 || participantErrors.value.length > 0,
+    )
+    const previewPool = computed(() => {
+      const base = previewUsesDemo.value ? DEMO_PEOPLE : participantsAll.value
+      const won = new Set(previewWinners.value.map((p) => p.id))
+      return base.filter((p) => !won.has(p.id))
+    })
+    const previewStageComponent = computed(() =>
+      previewPrize.value ? markRaw(stageOf(previewPrize.value.style).component) : null,
+    )
+    const previewKey = computed(
+      () => `${previewIndex.value}-${previewPrize.value?.style}-${previewEpoch.value}`,
+    )
+
+    const previewCtx = makeDrawEngine({
+      prize: () => previewPrize.value,
+      pool: () => previewPool.value,
+      remaining: () =>
+        previewPrize.value
+          ? Math.max(0, previewPrize.value.count - previewWinners.value.length)
+          : 0,
+      record(people) {
+        previewWinners.value.push(...people)
+      },
+      onBusy: (b) => (previewBusy.value = b),
+      onHint: (t) => (previewHint.value = t),
+    })
+
+    function resetPreview() {
+      previewWinners.value = []
+      previewBusy.value = false
+      previewEpoch.value++
+      clearConfetti()
+    }
+    function openPreview(i) {
+      previewIndex.value = i
+      resetPreview()
+      if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur()
+    }
+    function closePreview() {
+      previewIndex.value = -1
+      resetPreview()
+    }
+    // 預覽中切換動畫樣式 / 抽獎模式 / 名額時，重新開始模擬
+    watch(
+      () => [previewPrize.value?.style, previewPrize.value?.mode, previewPrize.value?.count],
+      () => {
+        if (previewIndex.value >= 0) resetPreview()
+      },
+    )
+    function previewPress() {
+      previewStageRef.value?.press()
+    }
 
     // --- 鍵盤操作 ---
     // F：進入 / 離開抽獎模式（全螢幕）；Esc：離開抽獎模式
@@ -235,6 +317,16 @@ createApp({
       if (isTyping(e.target)) return
       if (e.ctrlKey || e.altKey || e.metaKey) return
 
+      if (previewIndex.value >= 0) {
+        if (e.code === 'Escape') {
+          closePreview()
+        } else if (ACTION_KEYS.includes(e.code)) {
+          e.preventDefault()
+          if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur()
+          if (!e.repeat) previewPress()
+        }
+        return
+      }
       if (e.code === 'KeyF') {
         e.preventDefault()
         if (!e.repeat) togglePresentation()
@@ -271,6 +363,7 @@ createApp({
     // --- 抽獎模式（全螢幕） ---
     function enterPresentation() {
       if (isPresenting.value) return
+      if (previewIndex.value >= 0) closePreview()
       if (!state.prizes.length) return notify('請先新增獎項')
       if (participantErrors.value.length) {
         return notify(`參與人員名單有 ${participantErrors.value.length} 處格式錯誤，請先修正`)
@@ -434,6 +527,21 @@ createApp({
       prevPrize,
       nextPrize,
       isPresenting,
+      previewIndex,
+      previewPrize,
+      previewWinners,
+      previewBusy,
+      previewHint,
+      previewUsesDemo,
+      previewPool,
+      previewStageComponent,
+      previewKey,
+      previewStageRef,
+      previewCtx,
+      openPreview,
+      closePreview,
+      resetPreview,
+      previewPress,
       enterPresentation,
       exitPresentation,
       resetSystem,
