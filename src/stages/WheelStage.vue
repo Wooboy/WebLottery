@@ -34,7 +34,9 @@ const fontSize = computed(() =>
   sectors.value.length <= 6 ? 13 : sectors.value.length <= 9 ? 11 : 9,
 )
 const isAll = computed(() => props.prize.mode === 'all' && props.prize.count > 1)
-const shownResult = computed(() => result.value || props.winners[props.winners.length - 1] || '')
+const shownResult = computed(
+  () => result.value || props.winners[props.winners.length - 1]?.name || '',
+)
 
 watchEffect(() => {
   props.ctx.setHint(
@@ -95,7 +97,7 @@ async function land() {
   const [winner] = ctx.decide(1)
   const S = sectors.value.length
   const a = angle.value
-  let k = sectors.value.indexOf(winner)
+  let k = sectors.value.findIndex((s) => s.id === winner.id)
   if (k < 0) {
     // 中獎者不在盤面上：替換一個遠離指針的格子（轉盤高速轉動中，觀眾看不出來）
     const under = Math.floor((((-rot.value % 360) + 360) % 360) / a)
@@ -112,7 +114,7 @@ async function land() {
     tickIfCrossed()
   })
   highlight.value = k
-  result.value = winner
+  result.value = winner.name
   ctx.commit([winner], { big: props.prize.count === 1 })
 }
 
@@ -154,7 +156,7 @@ defineExpose({ press })
           <circle r="99" fill="rgba(255,255,255,0.15)" />
           <template v-if="sectors.length > 1">
             <path
-              v-for="(name, k) in sectors"
+              v-for="(s, k) in sectors"
               :key="'p' + k"
               :d="sectorPath(k)"
               :fill="COLORS[k % COLORS.length]"
@@ -164,11 +166,7 @@ defineExpose({ press })
             />
           </template>
           <circle v-else r="96" :fill="COLORS[0]" />
-          <g
-            v-for="(name, k) in sectors"
-            :key="'t' + k"
-            :transform="`rotate(${(k + 0.5) * angle})`"
-          >
+          <g v-for="(s, k) in sectors" :key="'t' + k" :transform="`rotate(${(k + 0.5) * angle})`">
             <text
               x="0"
               y="-58"
@@ -182,7 +180,7 @@ defineExpose({ press })
               stroke="rgba(0,0,0,0.35)"
               stroke-width="1.5"
             >
-              {{ label(name) }}
+              {{ label(s.name) }}
             </text>
           </g>
         </g>

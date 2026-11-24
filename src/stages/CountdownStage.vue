@@ -11,7 +11,7 @@ const count = ref(0)
 const typed = ref('')
 const revealed = ref([])
 
-const lastWinner = computed(() => props.winners[props.winners.length - 1] || '')
+const lastWinner = computed(() => props.winners[props.winners.length - 1]?.name || '')
 
 watchEffect(() => {
   props.ctx.setHint(phase.value === 'idle' ? '按 [空白鍵] 開始倒數' : '揭曉中…')
@@ -20,7 +20,7 @@ watchEffect(() => {
 async function run() {
   const { ctx } = props
   if (!ctx.canDraw()) return
-  const names = ctx.decide(ctx.roundSize())
+  const people = ctx.decide(ctx.roundSize())
   ctx.setBusy(true)
   typed.value = ''
   revealed.value = []
@@ -33,22 +33,22 @@ async function run() {
   }
   ctx.sfx.hit()
   phase.value = 'revealing'
-  if (names.length === 1) {
-    for (const ch of Array.from(names[0])) {
+  if (people.length === 1) {
+    for (const ch of Array.from(people[0].name)) {
       typed.value += ch
       ctx.sfx.tick()
       await kit.sleep(260)
     }
   } else {
-    const gap = names.length > 10 ? 120 : 300
-    for (const n of names) {
-      revealed.value.push(n)
+    const gap = people.length > 10 ? 120 : 300
+    for (const p of people) {
+      revealed.value.push(p.name)
       ctx.sfx.pop()
       await kit.sleep(gap)
     }
   }
   await kit.sleep(200)
-  ctx.commit(names, { big: props.prize.count === 1 })
+  ctx.commit(people, { big: props.prize.count === 1 })
   phase.value = 'idle'
   ctx.setBusy(false)
 }

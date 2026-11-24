@@ -62,14 +62,48 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div class="glass-panel p-6 rounded-[2.5rem]">
-                <h3 class="font-bold mb-4 flex justify-between items-center">
+                <h3 class="font-bold mb-2 flex justify-between items-center gap-3">
                   <span>👥 參與人員名單 (共 {{ participantsAll.length }} 位)</span>
+                  <button
+                    @click="shuffleParticipants"
+                    :disabled="isListLocked || participantsAll.length < 2"
+                    :title="isListLocked ? '已開始抽獎，名單已鎖定' : '以安全亂數打亂名單順序'"
+                    class="shrink-0 text-xs font-bold px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/30 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    🔀 打亂順序
+                  </button>
                 </h3>
+                <p class="text-[11px] opacity-50 mb-3">
+                  格式：每行「ID,顯示名稱」，ID 建議使用員工編號（不可重複，顯示名稱可重複）。
+                  可直接從 Excel 複製兩欄貼上。
+                </p>
                 <textarea
                   v-model="state.rawParticipants"
-                  class="w-full h-64 bg-black/30 rounded-2xl p-4 outline-none border border-white/10 text-sm focus:border-white/40"
-                  placeholder="請在此輸入名單，一人一行..."
+                  :readonly="isListLocked"
+                  :class="['w-full h-64 bg-black/30 rounded-2xl p-4 outline-none border text-sm font-mono',
+                    isListLocked ? 'border-white/5 opacity-60 cursor-not-allowed' : participantErrors.length ? 'border-red-400/60 focus:border-red-300' : 'border-white/10 focus:border-white/40']"
+                  placeholder="E001,王小明&#10;E002,李大華&#10;E003,王小明"
                 ></textarea>
+                <p
+                  v-if="isListLocked"
+                  class="mt-3 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-xl px-3 py-2"
+                >
+                  🔒 已開始抽獎，名單已鎖定。如需修改名單或打亂順序，請先按「🧹 清空中獎名單」。
+                </p>
+                <div
+                  v-if="participantErrors.length"
+                  class="mt-3 text-xs text-red-200 bg-red-500/10 border border-red-400/30 rounded-xl px-3 py-2 max-h-32 overflow-y-auto"
+                >
+                  <div class="font-bold mb-1">
+                    ⚠️ 名單有 {{ participantErrors.length }} 處錯誤（修正前無法開始抽獎）：
+                  </div>
+                  <div v-for="err in participantErrors.slice(0, 20)" :key="err.lineNo">
+                    第 {{ err.lineNo }} 行「{{ err.text }}」：{{ err.reason }}
+                  </div>
+                  <div v-if="participantErrors.length > 20" class="opacity-70">
+                    …另有 {{ participantErrors.length - 20 }} 處
+                  </div>
+                </div>
               </div>
 
               <div class="glass-panel p-6 rounded-[2.5rem] space-y-6">
@@ -291,7 +325,7 @@
               :ctx="ctx"
               :prize="activePrize"
               :pool="availablePool"
-              :winners="currentWinnerNames"
+              :winners="currentWinnerPeople"
             ></component>
 
             <div class="mt-4 flex flex-col items-center gap-4 shrink-0">
@@ -302,9 +336,12 @@
                   <div
                     v-for="win in currentWinners"
                     :key="win.id || win.seed"
-                    class="bg-white/20 border border-yellow-500/30 px-6 py-2 rounded-2xl text-2xl font-black text-yellow-300 shadow-xl"
+                    class="bg-white/20 border border-yellow-500/30 px-6 py-2 rounded-2xl text-center shadow-xl"
                   >
-                    {{ win.winner }}
+                    <div class="text-2xl font-black text-yellow-300 leading-tight">{{ win.winner }}</div>
+                    <div v-if="win.winnerId" class="text-[11px] font-mono opacity-50">
+                      {{ win.winnerId }}
+                    </div>
                   </div>
                 </transition-group>
               </div>
@@ -374,8 +411,9 @@
                 <thead class="bg-white/10 text-xs text-white/50 uppercase tracking-widest">
                   <tr>
                     <th class="p-6">獎項名稱</th>
+                    <th class="p-6">ID</th>
                     <th class="p-6">得獎英雄</th>
-                    <th class="p-6 font-mono text-center">種子碼</th>
+                    <th class="p-6 font-mono text-center">抽出時間戳</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
@@ -385,11 +423,12 @@
                     class="hover:bg-white/5 transition"
                   >
                     <td class="p-6 font-bold text-yellow-400">{{ res.prizeName }}</td>
+                    <td class="p-6 font-mono text-sm opacity-70">{{ res.winnerId || '—' }}</td>
                     <td class="p-6 font-black text-3xl tracking-tight">{{ res.winner }}</td>
                     <td class="p-6 font-mono text-[10px] opacity-20 text-center">{{ res.seed }}</td>
                   </tr>
                   <tr v-if="state.results.length === 0">
-                    <td colspan="3" class="p-32 text-center opacity-20 italic text-xl">
+                    <td colspan="4" class="p-32 text-center opacity-20 italic text-xl">
                       目前尚無抽獎紀錄
                     </td>
                   </tr>

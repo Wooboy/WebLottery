@@ -1,6 +1,7 @@
 import { createApp, reactive, ref, computed, onMounted, onBeforeUnmount, watch, markRaw } from 'vue'
 import './style.css'
-import { sample } from './lib/random.js'
+import { sample, shuffle } from './lib/random.js'
+import { parseParticipants } from './lib/participants.js'
 import { sfx, setSoundEnabled } from './lib/sound.js'
 import { confetti, clearConfetti } from './lib/confetti.js'
 import { STAGES, DEFAULT_STAGE, stageOf, parseStageKey } from './stages/index.js'
@@ -94,12 +95,24 @@ createApp({
     )
 
     // --- 計算屬性 ---
-    const participantsAll = computed(() =>
-      state.rawParticipants
-        .split('\n')
-        .map((s) => s.trim())
-        .filter((s) => s !== ''),
+    // 參與人員：每行「ID,顯示名稱」，以 ID 為唯一識別（同名不同人不會互相影響）
+    const parsedParticipants = computed(() => parseParticipants(state.rawParticipants))
+    const participantsAll = computed(() => parsedParticipants.value.people)
+    const participantErrors = computed(() => parsedParticipants.value.errors)
+
+    // 已開始抽獎（有任何中獎紀錄）就鎖定名單，避免抽獎中途名單變動；
+    // 「清空中獎名單」後才解除。名單格式有錯時不鎖定，讓舊資料可以修正。
+    const isListLocked = computed(
+      () => state.results.length > 0 && participantErrors.value.length === 0,
     )
+
+    function shuffleParticipants() {
+      if (isListLocked.value) return
+      const lines = state.rawParticipants.split(/\r?\n/).filter((l) => l.trim())
+      if (lines.length < 2) return
+      state.rawParticipants = shuffle(lines).join('\n')
+      notify(`已打亂 ${lines.length} 行名單順序`)
+    }
 
     const activePrize = computed(() => state.prizes[state.currentIndex] || null)
 
@@ -120,16 +133,19 @@ createApp({
               r.prizeName === prize.name ||
               (!prize.allowRepeat && !repeatPrizeNames.has(r.prizeName)),
           )
-          .map((r) => r.winner),
+          // 舊版紀錄沒有 winnerId，以名稱比對
+          .map((r) => (r.winnerId ?? r.winner).toUpperCase()),
       )
-      return participantsAll.value.filter((p) => !excluded.has(p))
+      return participantsAll.value.filter((p) => !excluded.has(p.id.toUpperCase()))
     })
 
     const currentWinners = computed(() => {
       if (!activePrize.value) return []
       return state.results.filter((r) => r.prizeName === activePrize.value.name)
     })
-    const currentWinnerNames = computed(() => currentWinners.value.map((r) => r.winner))
+    const currentWinnerPeople = computed(() =>
+      currentWinners.value.map((r) => ({ id: r.winnerId ?? '', name: r.winner })),
+    )
 
     function remainingCount(prizeName) {
       const p = state.prizes.find((i) => i.name === prizeName)
@@ -181,17 +197,18 @@ createApp({
         return true
       },
       decide: (n) => sample(availablePool.value, n),
-      commit(names, { big = false } = {}) {
+      commit(people, { big = false } = {}) {
         const timestamp = Date.now()
-        for (const winner of names) {
+        for (const person of people) {
           state.results.push({
             id: `${timestamp}-${drawCounter++}`,
             prizeName: activePrize.value.name,
-            winner,
+            winnerId: person.id,
+            winner: person.name,
             seed: timestamp,
           })
         }
-        if (!names.length) return
+        if (!people.length) return
         if (state.config.effects !== false) confetti({ big })
         big ? sfx.bigWin() : sfx.win()
         if (ctx.remaining() > 0 && ctx.poolSize() === 0) notify('可用人員名單已空，無法再抽！')
@@ -255,6 +272,9 @@ createApp({
     function enterPresentation() {
       if (isPresenting.value) return
       if (!state.prizes.length) return notify('請先新增獎項')
+      if (participantErrors.value.length) {
+        return notify(`參與人員名單有 ${participantErrors.value.length} 處格式錯誤，請先修正`)
+      }
       if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur()
       isPresenting.value = true
       const req = document.documentElement.requestFullscreen?.()
@@ -361,10 +381,19 @@ createApp({
 
     function exportCSV() {
       if (state.results.length === 0) return alert('目前尚無紀錄可匯出')
-      let content = '﻿獎項名稱,獎品內容,中獎人員,亂數種子(Timestamp)\n'
+      // 欄位內含逗號、引號或換行時加上引號；開頭為 = + - @ 時加上 ' 避免被 Excel 當成公式
+      const cell = (v) => {
+        let t = String(v ?? '')
+        if (/^[=+\-@]/.test(t)) t = "'" + t
+        return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
+      }
+      let content = '\ufeff獎項名稱,獎品內容,ID,中獎人員,抽出時間戳(Timestamp)\n'
       state.results.forEach((r) => {
         const prize = state.prizes.find((p) => p.name === r.prizeName)
-        content += `${r.prizeName},${prize?.reward || ''},${r.winner},${r.seed}\n`
+        content +=
+          [r.prizeName, prize?.reward || '', r.winnerId ?? '', r.winner, r.seed]
+            .map(cell)
+            .join(',') + '\n'
       })
       const a = document.createElement('a')
       a.href = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8;' }))
@@ -387,10 +416,13 @@ createApp({
       hint,
       toast,
       participantsAll,
+      participantErrors,
+      isListLocked,
+      shuffleParticipants,
       availablePool,
       activePrize,
       currentWinners,
-      currentWinnerNames,
+      currentWinnerPeople,
       remainingCount,
       stageComponent,
       stageKey,

@@ -9,7 +9,7 @@ const props = defineProps(stageProps)
 const kit = useStageKit()
 
 const phase = ref('idle') // idle | running | animating | done
-const cells = ref([]) // { name, out, win, delay }
+const cells = ref([]) // { id, name, out, win, delay }
 const steps = ref([])
 const stepIdx = ref(0)
 let queue = [] // 淘汰順序
@@ -57,9 +57,9 @@ function start() {
   const k = ctx.roundSize()
   const pool = shuffle(props.pool)
   finalists = ctx.decide(k)
-  const fset = new Set(finalists)
-  queue = shuffle(pool.filter((n) => !fset.has(n)))
-  cells.value = pool.map((name) => ({ name, out: false, win: false, delay: 0 }))
+  const fset = new Set(finalists.map((p) => p.id))
+  queue = shuffle(pool.filter((p) => !fset.has(p.id)).map((p) => p.id))
+  cells.value = pool.map((p) => ({ id: p.id, name: p.name, out: false, win: false, delay: 0 }))
   steps.value = buildSteps(pool.length, finalists.length)
   stepIdx.value = 0
   ctx.setBusy(true)
@@ -77,7 +77,7 @@ async function eliminate() {
   phase.value = 'animating'
   const spread = Math.min(1100, 300 + kill.size * 8)
   for (const c of cells.value) {
-    if (kill.has(c.name)) {
+    if (kill.has(c.id)) {
       c.delay = Math.random() * spread
       c.out = true
     }

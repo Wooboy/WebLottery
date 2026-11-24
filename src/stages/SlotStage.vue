@@ -14,7 +14,7 @@ let stopLoop = null
 
 const idleNames = computed(() => {
   const w = props.winners
-  return w.length ? [w[w.length - 1]] : ['?']
+  return w.length ? [w[w.length - 1].name] : ['?']
 })
 
 const sizeClass = computed(() => {
@@ -46,7 +46,7 @@ function offsetOf(r) {
 }
 
 function makeStrip(extra) {
-  return Array.from({ length: 40 + extra }, () => pick(props.pool))
+  return Array.from({ length: 40 + extra }, () => pick(props.pool)?.name || '')
 }
 
 function start() {
@@ -74,14 +74,14 @@ async function stop() {
   const { ctx } = props
   phase.value = 'stopping'
   stopLoop?.()
-  const names = ctx.decide(reels.value.length)
-  reels.value = reels.value.slice(0, names.length)
+  const people = ctx.decide(reels.value.length)
+  reels.value = reels.value.slice(0, people.length)
   let lastIdx = -1
   await Promise.all(
     reels.value.map((r, i) => {
       const p0 = r.pos
       const landing = Math.ceil(p0) + 14 + i * 5
-      r.strip[landing % r.strip.length] = names[i]
+      r.strip[landing % r.strip.length] = people[i].name
       const dist = landing - p0
       return kit
         .animate(((2 * dist) / SPEED) * 1000, (t) => {
@@ -99,7 +99,7 @@ async function stop() {
         })
     }),
   )
-  ctx.commit(names, { big: props.prize.count === 1 })
+  ctx.commit(people, { big: props.prize.count === 1 })
   phase.value = 'idle'
   ctx.setBusy(false)
 }

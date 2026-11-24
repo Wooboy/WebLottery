@@ -9,7 +9,7 @@ const props = defineProps(stageProps)
 const kit = useStageKit()
 
 const phase = ref('idle') // idle | dealt | flipping | done
-const cards = ref([]) // { name, flipped }
+const cards = ref([]) // { id, name, flipped }
 
 const isAll = computed(() => props.prize.mode === 'all' && props.prize.count > 1)
 const sizeClass = computed(() => {
@@ -38,7 +38,7 @@ function deal() {
   if (!ctx.canDraw()) return
   const r = ctx.remaining()
   const n = Math.min(ctx.poolSize(), Math.max(r, Math.min(24, Math.max(8, r * 2))))
-  cards.value = ctx.decide(n).map((name) => ({ name, flipped: false }))
+  cards.value = ctx.decide(n).map((p) => ({ id: p.id, name: p.name, flipped: false }))
   phase.value = 'dealt'
   ctx.setBusy(true)
   ctx.sfx.whoosh()
@@ -65,7 +65,7 @@ async function flip(indices) {
   }
   await kit.sleep(650)
   ctx.commit(
-    indices.map((i) => cards.value[i].name),
+    indices.map((i) => ({ id: cards.value[i].id, name: cards.value[i].name })),
     { big: props.prize.count === 1 },
   )
   finishIfDone()

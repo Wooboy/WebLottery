@@ -49,7 +49,7 @@ onMounted(() => {
 onBeforeUnmount(() => observer?.disconnect())
 
 const isAll = computed(() => props.prize.mode === 'all' && props.prize.count > 1)
-const shown = computed(() => result.value || props.winners[props.winners.length - 1] || '')
+const shown = computed(() => result.value || props.winners[props.winners.length - 1]?.name || '')
 
 watchEffect(() => {
   props.ctx.setHint(phase.value === 'idle' ? '按 [空白鍵] 轉動扭蛋機' : '扭蛋中…')
@@ -71,7 +71,7 @@ async function once(fast) {
   capsule.value.state = 'open'
   ctx.sfx.pop()
   await kit.sleep(350)
-  result.value = winner
+  result.value = winner.name
   ctx.commit([winner], { big: props.prize.count === 1 })
 }
 

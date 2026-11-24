@@ -11,7 +11,7 @@ const phase = ref('idle') // idle | spinning
 const display = ref('')
 let stopSpin = null
 
-const lastWinner = computed(() => props.winners[props.winners.length - 1] || '')
+const lastWinner = computed(() => props.winners[props.winners.length - 1]?.name || '')
 const shown = computed(() => display.value || lastWinner.value)
 
 watchEffect(() => {
@@ -40,15 +40,15 @@ function press() {
     ctx.setBusy(true)
     let n = 0
     stopSpin = kit.every(60, () => {
-      display.value = pick(props.pool)
+      display.value = pick(props.pool)?.name || ''
       if (++n % 2 === 0) ctx.sfx.tick()
     })
     return
   }
-  const names = ctx.decide(ctx.roundSize())
-  if (!names.length) return stop()
-  ctx.commit(names)
-  display.value = names[names.length - 1]
+  const people = ctx.decide(ctx.roundSize())
+  if (!people.length) return stop()
+  ctx.commit(people)
+  display.value = people[people.length - 1].name
   if (props.prize.mode === 'all' || ctx.remaining() <= 0 || ctx.poolSize() <= 0) stop()
 }
 
