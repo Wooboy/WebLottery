@@ -512,11 +512,15 @@ createApp({
       // 使用者以 Esc / F11 等方式離開全螢幕時，同步回到一般模式
       if (!isFullscreen.value && isPresenting.value) isPresenting.value = false
     }
-    // 離開抽獎模式時舞台會卸載，未完成的回合不記錄，解除鎖定
-    watch(isPresenting, () => {
-      for (const k of Object.keys(stageBusy)) delete stageBusy[k]
-      for (const k of Object.keys(stageHints)) delete stageHints[k]
-      stageCtxCache.clear()
+    // 離開抽獎模式時抽獎畫面只是隱藏（各獎項的結果畫面保留，重新進入仍在）；
+    // 若正在進行中的回合，重建該獎項的舞台以中止動畫，未完成的回合不記錄
+    watch(isPresenting, (on) => {
+      if (!on && isBusy.value && activePrize.value) {
+        const key = stageKey.value
+        const id = activePrize.value.id
+        delete stageBusy[key]
+        prizeEpoch[id] = (prizeEpoch[id] || 0) + 1
+      }
       toast.value = ''
       clearConfetti()
     })

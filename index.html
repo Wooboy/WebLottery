@@ -421,8 +421,9 @@
         </main>
 
         <!-- 頁面：抽獎（全螢幕抽獎模式） -->
+        <!-- 用 v-show：離開全螢幕時只隱藏，各獎項的抽獎畫面保留，重新進入仍停在上次結果 -->
         <main
-          v-if="isPresenting"
+          v-show="isPresenting"
           class="flex-1 flex flex-col relative z-10 overflow-hidden min-h-0"
         >
           <div v-if="activePrize" class="lt-screen">
