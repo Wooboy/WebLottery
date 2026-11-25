@@ -294,6 +294,16 @@
                           {{ st.label }}
                         </option>
                       </select>
+                      <select
+                        v-if="p.style === 'elimination'"
+                        v-model.number="p.elimRounds"
+                        title="淘汰制每局按幾下（含最後揭曉）"
+                        class="ml-2 bg-black/30 border border-white/15 rounded-lg px-2 py-1 text-xs outline-none focus:border-white/50"
+                      >
+                        <option v-for="n in elimRoundOptions" :key="n" :value="n">
+                          {{ n === 1 ? '1 輪（直接揭曉）' : n + ' 輪' }}
+                        </option>
+                      </select>
                       <button
                         @click="openPreview(i)"
                         title="模擬此獎項的抽獎畫面（不會記錄）"
@@ -467,6 +477,17 @@
                 title="切換動畫樣式（會同步更新獎項設定）"
               >
                 <option v-for="st in stages" :key="st.key" :value="st.key">{{ st.label }}</option>
+              </select>
+              <select
+                v-if="previewPrize.style === 'elimination'"
+                v-model.number="previewPrize.elimRounds"
+                @change="$event.target.blur(); resetPreview()"
+                class="bg-black/40 border border-white/20 rounded-lg px-2 py-1 text-sm outline-none"
+                title="淘汰輪數（會同步更新獎項設定）"
+              >
+                <option v-for="n in elimRoundOptions" :key="n" :value="n">
+                  {{ n === 1 ? '1 輪（直接揭曉）' : n + ' 輪' }}
+                </option>
               </select>
               <span class="text-xs opacity-60">
                 {{ previewPrize.count }} 名 · {{ previewPrize.count > 1 ? (previewPrize.mode ===

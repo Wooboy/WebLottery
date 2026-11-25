@@ -1,6 +1,6 @@
 <script setup>
 // 淘汰制：第一下列出所有可抽人員並以安全亂數決定中獎者；
-// 之後每按一下淘汰一批（大名單先留 1/3、再減半），最後剩「名額 + 2」人時揭曉。
+// 之後每按一下淘汰一批，輪數由獎項設定（含最後揭曉），揭曉前剩「名額 + 2」人。
 // 適合一次抽多人：所有中獎者在最後一下同時亮起。
 import { ref, computed, watchEffect } from 'vue'
 import { useStageKit, stageProps } from './kit.js'
@@ -41,16 +41,23 @@ watchEffect(() => {
   props.ctx.setHint(hint)
 })
 
-// 淘汰階段：大名單每次留 1/3、再每次減半，最後剩「中獎人數 + 2」再揭曉
-function buildSteps(n, k) {
+// 淘汰階段：依獎項設定的輪數（含最後揭曉）規劃每輪剩幾人。
+// 前幾輪以等比例縮減，揭曉前一輪剩「名額 + 2」人製造懸念，最後一輪揭曉。
+// 例：60 人抽 5 位、3 輪 → 20 → 7 → 揭曉 5 位
+function buildSteps(n, k, rounds) {
+  if (n <= k) return [k]
+  const pre = Math.min(n, k + 2)
+  const elim = Math.max(0, rounds - 1)
   const seq = []
-  while (n > k) {
-    if (n > 3 * k + 20) n = Math.max(k, Math.ceil(n / 3))
-    else if (n > 2 * k + 5) n = Math.max(k, Math.ceil(n / 2))
-    else if (n > k + 2) n = k + 2
-    else n = k
-    seq.push(n)
+  let prev = n
+  for (let i = 1; i <= elim; i++) {
+    const t = i === elim ? pre : Math.round(pre * Math.pow(n / pre, 1 - i / elim))
+    if (t < prev && t > k) {
+      seq.push(t)
+      prev = t
+    }
   }
+  seq.push(k)
   return seq
 }
 
@@ -64,9 +71,7 @@ function start() {
   queue = shuffle(pool.filter((p) => !fset.has(p.id)).map((p) => p.id))
   cells.value = pool.map((p) => ({ id: p.id, name: p.name, out: false, win: false, delay: 0 }))
   total.value = pool.length
-  steps.value = buildSteps(pool.length, finalists.length)
-  // 可抽人數剛好等於名額時沒有淘汰階段，直接進入揭曉
-  if (!steps.value.length) steps.value = [finalists.length]
+  steps.value = buildSteps(pool.length, finalists.length, props.prize.elimRounds || 3)
   stepIdx.value = 0
   ctx.setBusy(true)
   ctx.sfx.whoosh()

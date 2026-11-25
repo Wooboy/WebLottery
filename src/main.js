@@ -46,8 +46,12 @@ createApp({
         ),
     )
 
+    // 淘汰制：每局淘汰輪數（含最後揭曉那一下）
+    const ELIM_ROUND_OPTIONS = [1, 2, 3, 4, 5, 6]
+    const DEFAULT_ELIM_ROUNDS = 3
+
     function newPrize(fields = {}) {
-      return {
+      const p = {
         name: '新獎項',
         reward: '',
         count: 1,
@@ -55,8 +59,12 @@ createApp({
         bgUrl: '',
         allowRepeat: false,
         style: DEFAULT_STAGE,
+        elimRounds: DEFAULT_ELIM_ROUNDS,
         ...fields,
       }
+      const r = parseInt(p.elimRounds)
+      p.elimRounds = ELIM_ROUND_OPTIONS.includes(r) ? r : DEFAULT_ELIM_ROUNDS
+      return p
     }
 
     // 預設資料結構
@@ -618,6 +626,7 @@ createApp({
       themeVars,
       hintParts,
       stages: STAGES,
+      elimRoundOptions: ELIM_ROUND_OPTIONS,
       stageOf,
       state,
       isBusy,
