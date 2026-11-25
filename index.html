@@ -8,10 +8,7 @@
   <body class="bg-black text-white antialiased">
     <div id="app" v-cloak>
       <!-- 主背景容器 (色系由 app.js 計算) -->
-      <div
-        class="app-bg relative h-screen w-full flex flex-col"
-        :style="themeVars"
-      >
+      <div class="app-bg relative h-screen w-full flex flex-col" :style="themeVars">
         <!-- 獎項背景圖 -->
         <div
           v-if="isPresenting && activePrize"
@@ -88,7 +85,10 @@
                     <option :value="4">4 碼</option>
                     <option :value="5">5 碼</option>
                   </select>
-                  <span class="opacity-60">{{ usesSlot ? '有獎項使用老虎機，名單 ID 須符合此長度（英數字）' : '目前沒有獎項使用老虎機' }}</span>
+                  <span class="opacity-60"
+                    >{{ usesSlot ? '有獎項使用老虎機，名單 ID 須符合此長度（英數字）' :
+                    '目前沒有獎項使用老虎機' }}</span
+                  >
                 </label>
                 <div
                   :class="['list-editor', isListLocked ? 'locked' : participantErrors.length ? 'has-error' : '']"
@@ -173,6 +173,33 @@
                   </p>
                 </div>
                 <div>
+                  <h3 class="font-bold mb-2">💾 設定檔匯出 / 匯入</h3>
+                  <div class="bg-white/5 p-4 rounded-xl border border-white/10">
+                    <div class="grid grid-cols-2 gap-3">
+                      <button
+                        @click="exportSettings"
+                        class="py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-bold transition-colors"
+                      >
+                        ⬇️ 匯出設定檔
+                      </button>
+                      <label
+                        class="py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-bold transition-colors text-center cursor-pointer"
+                      >
+                        ⬆️ 匯入設定檔
+                        <input
+                          type="file"
+                          accept=".json,application/json"
+                          class="hidden"
+                          @change="importSettings"
+                        />
+                      </label>
+                    </div>
+                    <p class="text-[10px] mt-2 opacity-50 leading-relaxed">
+                      包含參與名單、獎項與系統設定（不含中獎紀錄）。可在個人電腦設定好後匯出，再到會場電腦匯入；匯入會覆蓋目前的名單與獎項，並清空中獎紀錄。
+                    </p>
+                  </div>
+                </div>
+                <div>
                   <h3 class="font-bold mb-2">📥 獎項 CSV 匯入</h3>
                   <div class="bg-white/5 p-4 rounded-xl border border-white/10">
                     <input
@@ -182,7 +209,8 @@
                       class="text-xs w-full cursor-pointer"
                     />
                     <p class="text-[10px] mt-2 opacity-50 italic">
-                      CSV 格式：獎項名稱, 獎品, 數量, 背景圖片URL, 允許重複中獎(Y/N), 動畫樣式（後兩欄可省略）
+                      CSV 格式：獎項名稱, 獎品, 數量, 背景圖片URL, 允許重複中獎(Y/N),
+                      動畫樣式（後兩欄可省略）
                     </p>
                   </div>
                 </div>
@@ -372,7 +400,9 @@
                     <span v-if="win.winnerId">{{ win.winnerId }}</span>
                   </div>
                 </transition-group>
-                <div v-if="!currentWinners.length" class="lt-chip lt-chip-empty">本獎項尚無中獎者</div>
+                <div v-if="!currentWinners.length" class="lt-chip lt-chip-empty">
+                  本獎項尚無中獎者
+                </div>
               </div>
               <div class="lt-hint">
                 <template v-for="(part, i) in hintParts" :key="i">
@@ -435,9 +465,9 @@
                 <option v-for="st in stages" :key="st.key" :value="st.key">{{ st.label }}</option>
               </select>
               <span class="text-xs opacity-60">
-                {{ previewPrize.count }} 名 ·
-                {{ previewPrize.count > 1 ? (previewPrize.mode === 'all' ? '一次抽完' : '連續單抽') : '單抽' }}
-                · 剩 {{ Math.max(0, previewPrize.count - previewWinners.length) }} 名
+                {{ previewPrize.count }} 名 · {{ previewPrize.count > 1 ? (previewPrize.mode ===
+                'all' ? '一次抽完' : '連續單抽') : '單抽' }} · 剩 {{ Math.max(0, previewPrize.count
+                - previewWinners.length) }} 名
               </span>
               <div class="ml-auto flex gap-2">
                 <button
@@ -456,8 +486,12 @@
             </div>
             <p class="shrink-0 text-[11px] text-center py-1.5 bg-amber-400/10 text-amber-100/80">
               模擬抽獎，結果不會寫入中獎紀錄
-              <template v-if="previewUsesDemo">｜參與名單尚未輸入或格式有誤，使用 30 位示範人員</template>
-              <template v-else>｜使用目前參與名單（{{ previewPool.length + previewWinners.length }} 位）</template>
+              <template v-if="previewUsesDemo"
+                >｜參與名單尚未輸入或格式有誤，使用 30 位示範人員</template
+              >
+              <template v-else
+                >｜使用目前參與名單（{{ previewPool.length + previewWinners.length }} 位）</template
+              >
             </p>
 
             <div class="flex-1 min-h-0 flex flex-col p-5">
@@ -489,7 +523,9 @@
                 >
               </div>
               <div class="flex items-center gap-4">
-                <span class="text-white/50 text-xs tracking-[0.3em] font-bold">{{ previewHint }}</span>
+                <span class="text-white/50 text-xs tracking-[0.3em] font-bold"
+                  >{{ previewHint }}</span
+                >
                 <button
                   @click="previewPress"
                   class="px-6 py-2 rounded-full font-black bg-yellow-400 text-black hover:bg-yellow-300 transition"
@@ -557,7 +593,6 @@
             </div>
           </div>
         </main>
-
       </div>
     </div>
 

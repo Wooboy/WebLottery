@@ -495,6 +495,74 @@ createApp({
       reader.readAsText(file)
     }
 
+    // --- 設定檔匯出 / 匯入：在個人電腦設定好，再帶到會場電腦 ---
+    // 只包含參與名單、獎項與系統設定，不含中獎紀錄
+    const SETTINGS_FILE_TYPE = 'web-lottery-settings'
+
+    function download(content, filename, type) {
+      const a = document.createElement('a')
+      const url = URL.createObjectURL(new Blob([content], { type }))
+      a.href = url
+      a.download = filename
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+
+    function exportSettings() {
+      const pad = (n) => String(n).padStart(2, '0')
+      const d = new Date()
+      const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`
+      const data = {
+        type: SETTINGS_FILE_TYPE,
+        version: 1,
+        exportedAt: d.toISOString(),
+        rawParticipants: state.rawParticipants,
+        prizes: state.prizes,
+        config: state.config,
+      }
+      download(JSON.stringify(data, null, 2), `抽獎設定_${stamp}.json`, 'application/json')
+    }
+
+    function importSettings(e) {
+      const file = e.target.files[0]
+      e.target.value = ''
+      if (!file) return
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        let data
+        try {
+          data = JSON.parse(String(ev.target.result).replace(/^﻿/, ''))
+        } catch {
+          return alert('匯入失敗：檔案不是有效的設定檔（JSON 格式錯誤）')
+        }
+        if (data?.type !== SETTINGS_FILE_TYPE || !Array.isArray(data.prizes)) {
+          return alert('匯入失敗：這不是本抽獎系統匯出的設定檔')
+        }
+        const people = parseParticipants(String(data.rawParticipants || '')).people.length
+        const msg = [
+          `即將匯入設定檔「${file.name}」：`,
+          `・參與人員 ${people} 人`,
+          `・獎項 ${data.prizes.length} 個`,
+          '',
+          '目前的名單、獎項與系統設定將被覆蓋。',
+        ]
+        if (state.results.length) {
+          msg.push(`⚠️ 目前有 ${state.results.length} 筆中獎紀錄，匯入後將一併清空！`)
+        }
+        if (!confirm(msg.join('\n'))) return
+        state.rawParticipants = String(data.rawParticipants || '')
+        state.prizes = data.prizes.map((p) =>
+          newPrize({ ...p, count: parseInt(p?.count) || 1, style: normalizeStageKey(p?.style) }),
+        )
+        state.config = { ...defaultState.config, ...(data.config || {}) }
+        state.results = []
+        state.currentIndex = 0
+        stageEpoch.value++
+        alert('匯入設定成功！')
+      }
+      reader.readAsText(file)
+    }
+
     function confirmRedraw() {
       if (confirm('警告：這將清除此獎項目前的「所有」中獎紀錄並讓名額回流，確定嗎？')) {
         state.results = state.results.filter((r) => r.prizeName !== activePrize.value.name)
@@ -586,6 +654,8 @@ createApp({
       stageRef,
       ctx,
       importPrizeCSV,
+      exportSettings,
+      importSettings,
       confirmRedraw,
       changeTab,
       prevPrize,
