@@ -5,6 +5,7 @@ import PileStage from './PileStage.vue'
 import FlipStage from './FlipStage.vue'
 import CountdownStage from './CountdownStage.vue'
 import GachaStage from './GachaStage.vue'
+import EliminationStage from './EliminationStage.vue'
 
 // 抽獎動畫樣式（key 存於獎項設定 prize.style）
 export const STAGES = [
@@ -12,6 +13,7 @@ export const STAGES = [
   { key: 'slot', label: '老虎機', component: SlotStage },
   { key: 'wheel', label: '幸運轉盤', component: WheelStage },
   { key: 'pile', label: '選堆', component: PileStage },
+  { key: 'elimination', label: '淘汰制', component: EliminationStage },
   { key: 'flip', label: '翻牌', component: FlipStage },
   { key: 'countdown', label: '倒數揭曉', component: CountdownStage },
   { key: 'gacha', label: '扭蛋機', component: GachaStage },
@@ -19,22 +21,11 @@ export const STAGES = [
 
 export const DEFAULT_STAGE = 'classic'
 
-// 已停用的樣式對應到新樣式（淘汰制 → 選堆）
-const LEGACY = { elimination: 'pile', 淘汰制: 'pile' }
-
+// 不認得的樣式（例如手動修改過的設定檔）回到預設樣式
 export function normalizeStageKey(key) {
-  const k = LEGACY[key] || key
-  return STAGES.some((s) => s.key === k) ? k : DEFAULT_STAGE
+  return STAGES.some((s) => s.key === key) ? key : DEFAULT_STAGE
 }
 
 export function stageOf(key) {
   return STAGES.find((s) => s.key === normalizeStageKey(key)) || STAGES[0]
-}
-
-// CSV 匯入：接受 key 或中文名稱
-export function parseStageKey(text) {
-  const raw = (text || '').trim()
-  const t = LEGACY[raw] || LEGACY[raw.toLowerCase()] || raw.toLowerCase()
-  const s = STAGES.find((x) => x.key === t || x.label === raw)
-  return s ? s.key : DEFAULT_STAGE
 }

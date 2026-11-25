@@ -5,7 +5,7 @@ import { parseParticipants } from './lib/participants.js'
 import { toImageUrl, cssImageUrl } from './lib/image-url.js'
 import { sfx, setSoundEnabled } from './lib/sound.js'
 import { confetti, clearConfetti } from './lib/confetti.js'
-import { STAGES, DEFAULT_STAGE, stageOf, parseStageKey, normalizeStageKey } from './stages/index.js'
+import { STAGES, DEFAULT_STAGE, stageOf, normalizeStageKey } from './stages/index.js'
 
 const STORAGE_KEY = 'lottery_app_v2026_data'
 
@@ -468,34 +468,6 @@ createApp({
       state.currentIndex = (state.currentIndex + 1) % state.prizes.length
     }
 
-    function importPrizeCSV(e) {
-      const file = e.target.files[0]
-      if (!file) return
-      const reader = new FileReader()
-      reader.onload = (ev) => {
-        const lines = ev.target.result.split(/\r?\n/).filter((l) => l.trim())
-        if (lines.length > 1) {
-          state.prizes = lines.slice(1).map((l) => {
-            const [name, reward, count, bgUrl, repeat, style] = l.split(',').map((s) => s.trim())
-            return newPrize({
-              name,
-              reward,
-              count: parseInt(count) || 1,
-              bgUrl: bgUrl || '',
-              // 第 5 欄「允許重複中獎」：Y / 1 / 是 / true 視為允許
-              allowRepeat: /^(y|yes|1|true|是)$/i.test(repeat || ''),
-              // 第 6 欄「動畫樣式」：英文 key 或中文名稱
-              style: parseStageKey(style),
-            })
-          })
-          state.currentIndex = 0
-          alert('匯入獎項成功！')
-        }
-        e.target.value = ''
-      }
-      reader.readAsText(file)
-    }
-
     // --- 設定檔匯出 / 匯入：在個人電腦設定好，再帶到會場電腦 ---
     // 只包含參與名單、獎項與系統設定，不含中獎紀錄
     const SETTINGS_FILE_TYPE = 'web-lottery-settings'
@@ -671,7 +643,6 @@ createApp({
       stageKey,
       stageRef,
       ctx,
-      importPrizeCSV,
       exportSettings,
       importSettings,
       toImageUrl,

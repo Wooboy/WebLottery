@@ -199,21 +199,6 @@
                     </p>
                   </div>
                 </div>
-                <div>
-                  <h3 class="font-bold mb-2">📥 獎項 CSV 匯入</h3>
-                  <div class="bg-white/5 p-4 rounded-xl border border-white/10">
-                    <input
-                      type="file"
-                      @change="importPrizeCSV"
-                      accept=".csv"
-                      class="text-xs w-full cursor-pointer"
-                    />
-                    <p class="text-[10px] mt-2 opacity-50 italic">
-                      CSV 格式：獎項名稱, 獎品, 數量, 背景圖片URL, 允許重複中獎(Y/N),
-                      動畫樣式（後兩欄可省略）
-                    </p>
-                  </div>
-                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     @click="clearResults"
