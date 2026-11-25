@@ -9,9 +9,10 @@ const kit = useStageKit()
 const phase = ref('idle') // idle | counting | revealing
 const count = ref(0)
 const typed = ref('')
-const revealed = ref([])
+const revealed = ref([]) // 多人時依序跳出的 { id, name }
+const typedId = ref('')
 
-const lastWinner = computed(() => props.winners[props.winners.length - 1]?.name || '')
+const lastWinner = computed(() => props.winners[props.winners.length - 1] || null)
 
 watchEffect(() => {
   props.ctx.setHint(phase.value === 'idle' ? '按 [空白鍵] 開始倒數' : '揭曉中…')
@@ -23,6 +24,7 @@ async function run() {
   const people = ctx.decide(ctx.roundSize())
   ctx.setBusy(true)
   typed.value = ''
+  typedId.value = ''
   revealed.value = []
   phase.value = 'counting'
   ctx.sfx.drumroll(2.7)
@@ -39,10 +41,11 @@ async function run() {
       ctx.sfx.tick()
       await kit.sleep(260)
     }
+    typedId.value = people[0].id
   } else {
     const gap = people.length > 10 ? 120 : 300
     for (const p of people) {
-      revealed.value.push(p.name)
+      revealed.value.push(p)
       ctx.sfx.pop()
       await kit.sleep(gap)
     }
@@ -62,36 +65,76 @@ defineExpose({ press })
 
 <template>
   <div class="flex-1 flex items-center justify-center min-h-0 overflow-y-auto">
-    <div
-      v-if="phase === 'counting'"
-      :key="count"
-      class="countdown font-black glow-text text-[clamp(8rem,28vw,22rem)] leading-none"
-    >
-      {{ count }}
+    <div v-if="phase === 'counting'" class="ring">
+      <svg viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4" />
+        <circle
+          :key="count"
+          class="ring-arc"
+          cx="50"
+          cy="50"
+          r="45"
+          fill="none"
+          stroke-width="4"
+          stroke-linecap="round"
+          transform="rotate(-90 50 50)"
+        />
+      </svg>
+      <div :key="count" class="countdown font-black leading-none">{{ count }}</div>
     </div>
     <div v-else-if="revealed.length" class="flex flex-wrap justify-center gap-4 w-full py-2">
-      <div
-        v-for="(n, i) in revealed"
-        :key="i"
-        class="pop-in px-6 py-2 rounded-2xl bg-yellow-400/20 border border-yellow-300/50 text-4xl font-black text-yellow-300 glow-text"
-      >
-        {{ n }}
+      <div v-for="(p, i) in revealed" :key="i" class="pop-in lt-chip">
+        <b>{{ p.name }}</b>
+        <span>{{ p.id }}</span>
       </div>
     </div>
-    <div
-      v-else-if="typed || lastWinner"
-      class="name-display font-black text-yellow-300 glow-text tracking-tighter text-center"
-    >
-      {{ phase === 'revealing' ? typed : typed || lastWinner
-      }}<span v-if="phase === 'revealing'" class="caret">|</span>
+    <div v-else-if="typed || lastWinner" class="text-center">
+      <div class="name-display font-black text-gold tracking-tight">
+        {{ phase === 'revealing' || typed ? typed : lastWinner.name
+        }}<span v-if="phase === 'revealing'" class="caret">|</span>
+      </div>
+      <div v-if="typedId || (!typed && lastWinner)" class="win-id pop-in">
+        {{ typedId || lastWinner.id }}
+      </div>
     </div>
     <div v-else class="text-5xl opacity-10 font-black tracking-[1.5rem]">READY</div>
   </div>
 </template>
 
 <style scoped>
+.ring {
+  position: relative;
+  width: min(28vw, 55vh);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ring svg {
+  position: absolute;
+  inset: 0;
+}
+.ring-arc {
+  stroke: var(--accent);
+  stroke-dasharray: 283;
+  stroke-dashoffset: 0;
+  animation: ringDrain 0.9s linear both;
+}
+@keyframes ringDrain {
+  to {
+    stroke-dashoffset: 283;
+  }
+}
 .countdown {
+  font-size: min(16vw, 32vh);
   animation: countPop 0.9s ease-out both;
+}
+.win-id {
+  margin-top: 0.5rem;
+  font-family: Consolas, monospace;
+  font-size: clamp(0.9rem, 1.6vw, 2rem);
+  color: var(--muted);
+  letter-spacing: 0.1em;
 }
 @keyframes countPop {
   0% {

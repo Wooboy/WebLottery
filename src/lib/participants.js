@@ -45,7 +45,7 @@ export function parseParticipants(raw) {
       return
     }
     seen.set(key, lineNo)
-    people.push({ id, name })
+    people.push({ id, name, lineNo })
   })
 
   return { people, errors }

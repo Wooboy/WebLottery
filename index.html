@@ -9,12 +9,13 @@
     <div id="app" v-cloak>
       <!-- 主背景容器 (色系由 app.js 計算) -->
       <div
-        :class="['relative h-screen w-full flex flex-col transition-all duration-1000 bg-gradient-to-br', themeClasses[state.config.theme]?.grad || 'from-zinc-900 to-black']"
+        class="app-bg relative h-screen w-full flex flex-col"
+        :style="themeVars"
       >
         <!-- 獎項背景圖 -->
         <div
           v-if="isPresenting && activePrize"
-          class="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none transition-all duration-1000"
+          class="absolute inset-0 bg-cover bg-center opacity-20 pointer-events-none transition-all duration-1000"
           :style="{ backgroundImage: activePrize.bgUrl ? `url(${activePrize.bgUrl})` : '' }"
         ></div>
 
@@ -42,11 +43,10 @@
           </nav>
           <button
             @click="enterPresentation"
-            title="進入全螢幕抽獎 (F)"
+            title="進入全螢幕抽獎"
             class="ml-auto px-6 py-2.5 rounded-full font-black bg-yellow-400 text-black hover:bg-yellow-300 shadow-lg transition"
           >
-            ▶ 開始抽獎
-            <span class="ml-1 text-xs font-bold opacity-60 border border-black/30 rounded px-1">F</span>
+            ▶ 開始抽獎（全螢幕）
           </button>
         </header>
 
@@ -77,13 +77,44 @@
                   格式：每行「ID,顯示名稱」，ID 建議使用員工編號（不可重複，顯示名稱可重複）。
                   可直接從 Excel 複製兩欄貼上。
                 </p>
-                <textarea
-                  v-model="state.rawParticipants"
-                  :readonly="isListLocked"
-                  :class="['w-full h-64 bg-black/30 rounded-2xl p-4 outline-none border text-sm font-mono',
-                    isListLocked ? 'border-white/5 opacity-60 cursor-not-allowed' : participantErrors.length ? 'border-red-400/60 focus:border-red-300' : 'border-white/10 focus:border-white/40']"
-                  placeholder="E001,王小明&#10;E002,李大華&#10;E003,王小明"
-                ></textarea>
+                <label class="flex items-center gap-2 text-xs mb-3 opacity-80">
+                  員編長度（老虎機轉輪用）
+                  <select
+                    v-model.number="state.config.idLength"
+                    :disabled="isListLocked"
+                    class="bg-black/30 border border-white/15 rounded-lg px-2 py-0.5 outline-none disabled:opacity-40"
+                  >
+                    <option :value="3">3 碼</option>
+                    <option :value="4">4 碼</option>
+                    <option :value="5">5 碼</option>
+                  </select>
+                  <span class="opacity-60">{{ usesSlot ? '有獎項使用老虎機，名單 ID 須符合此長度（英數字）' : '目前沒有獎項使用老虎機' }}</span>
+                </label>
+                <div
+                  :class="['list-editor', isListLocked ? 'locked' : participantErrors.length ? 'has-error' : '']"
+                >
+                  <div class="list-gutter" aria-hidden="true">
+                    <div :style="{ transform: `translateY(${-listScrollTop}px)` }">
+                      <div
+                        v-for="n in listLineCount"
+                        :key="n"
+                        :class="{ err: errorLineSet.has(n) }"
+                      >
+                        {{ n }}
+                      </div>
+                    </div>
+                  </div>
+                  <textarea
+                    ref="listEl"
+                    v-model="state.rawParticipants"
+                    :readonly="isListLocked"
+                    wrap="off"
+                    spellcheck="false"
+                    class="list-text"
+                    placeholder="E001,王小明&#10;E002,李大華&#10;E003,王小明"
+                    @scroll="listScrollTop = $event.target.scrollTop"
+                  ></textarea>
+                </div>
                 <p
                   v-if="isListLocked"
                   class="mt-3 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-xl px-3 py-2"
@@ -97,7 +128,13 @@
                   <div class="font-bold mb-1">
                     ⚠️ 名單有 {{ participantErrors.length }} 處錯誤（修正前無法開始抽獎）：
                   </div>
-                  <div v-for="err in participantErrors.slice(0, 20)" :key="err.lineNo">
+                  <div
+                    v-for="err in participantErrors.slice(0, 20)"
+                    :key="err.lineNo"
+                    class="cursor-pointer hover:underline"
+                    title="點選跳到該行"
+                    @click="jumpToLine(err.lineNo)"
+                  >
                     第 {{ err.lineNo }} 行「{{ err.text }}」：{{ err.reason }}
                   </div>
                   <div v-if="participantErrors.length > 20" class="opacity-70">
@@ -114,7 +151,9 @@
                       v-for="(val, key) in themeClasses"
                       :key="key"
                       @click="state.config.theme = key"
-                      :class="['w-10 h-10 rounded-full border-4 transition-all', state.config.theme === key ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40', val.btn]"
+                      :title="val.label"
+                      :style="{ background: val.swatch }"
+                      :class="['w-10 h-10 rounded-full border-4 transition-all', state.config.theme === key ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-40']"
                     ></button>
                   </div>
                 </div>
@@ -129,8 +168,8 @@
                     </label>
                   </div>
                   <p class="text-[11px] mt-3 opacity-50 leading-relaxed">
-                    ⌨️ 按 [F] 或右上角「開始抽獎」進入全螢幕抽獎；抽獎中 [空白鍵] / [Enter]
-                    抽獎、[PageUp] / [PageDown] 切換獎項、[F] / [Esc] 離開（簡報筆可直接使用）
+                    ⌨️ 按右上角「▶ 開始抽獎（全螢幕）」進入抽獎畫面；抽獎中 [空白鍵] / [Enter]
+                    抽獎、[PageUp] / [PageDown] 切換獎項、[Esc] 或右上角 ✕ 離開（簡報筆可直接使用）
                   </p>
                 </div>
                 <div>
@@ -274,99 +313,81 @@
         <!-- 頁面：抽獎（全螢幕抽獎模式） -->
         <main
           v-if="isPresenting"
-          class="flex-1 flex flex-col p-6 relative z-10 overflow-hidden"
+          class="flex-1 flex flex-col relative z-10 overflow-hidden min-h-0"
         >
-          <div v-if="activePrize" class="flex flex-col h-full max-w-6xl mx-auto w-full min-h-0">
-            <div
-              class="glass-panel p-6 rounded-[3rem] flex items-center justify-between mb-4 shadow-2xl relative shrink-0"
-            >
-              <button
-                @click="prevPrize"
-                :disabled="isBusy"
-                aria-label="上一個獎項"
-                title="上一個獎項 (PageUp)"
-                class="w-14 h-14 rounded-full hover:bg-white/10 text-3xl transition disabled:opacity-20 disabled:cursor-not-allowed"
-              >
-                ❮
-              </button>
-              <div class="text-center flex-1">
-                <h2 class="text-5xl md:text-7xl font-black glow-text tracking-tighter">
-                  {{ activePrize.name }}
-                </h2>
-                <p class="text-xl opacity-70 mt-2 italic font-light">
-                  Reward: {{ activePrize.reward }}
-                </p>
-                <div
-                  class="mt-4 inline-block px-6 py-1 bg-white/10 rounded-full text-sm font-bold border border-white/20"
-                >
-                  剩餘：{{ remainingCount(activePrize.name) }} / {{ activePrize.count }}
-                </div>
-                <div
-                  v-if="activePrize.allowRepeat"
-                  class="mt-4 ml-2 inline-block px-4 py-1 bg-amber-400/20 rounded-full text-sm font-bold border border-amber-300/40 text-amber-200"
-                >
-                  可重複中獎
-                </div>
-                <div
-                  class="mt-4 ml-2 inline-block px-4 py-1 bg-white/5 rounded-full text-sm font-bold border border-white/15 opacity-70"
-                >
-                  🎲 {{ stageOf(activePrize.style).label }}
+          <div v-if="activePrize" class="lt-screen">
+            <!-- 上方：獎項 + 剩餘名額 -->
+            <div class="lt-top">
+              <div class="lt-title">
+                <span v-if="activePrize.reward" class="lt-tier">{{ activePrize.name }}</span>
+                <div class="lt-reward">{{ activePrize.reward || activePrize.name }}</div>
+                <span v-if="activePrize.allowRepeat" class="lt-tag">可重複中獎</span>
+              </div>
+              <div class="lt-count">
+                <div class="lt-count-lbl">剩餘名額</div>
+                <div class="lt-count-num">
+                  {{ remainingCount(activePrize.name) }}<small> / {{ activePrize.count }}</small>
                 </div>
               </div>
-              <button
-                @click="nextPrize"
-                :disabled="isBusy"
-                aria-label="下一個獎項"
-                title="下一個獎項 (PageDown)"
-                class="w-14 h-14 rounded-full hover:bg-white/10 text-3xl transition disabled:opacity-20 disabled:cursor-not-allowed"
-              >
-                ❯
-              </button>
+              <div class="lt-navs">
+                <button
+                  @click="prevPrize"
+                  :disabled="isBusy"
+                  aria-label="上一個獎項"
+                  title="上一個獎項 (PageUp)"
+                >
+                  ‹
+                </button>
+                <button
+                  @click="nextPrize"
+                  :disabled="isBusy"
+                  aria-label="下一個獎項"
+                  title="下一個獎項 (PageDown)"
+                >
+                  ›
+                </button>
+              </div>
             </div>
 
             <!-- 抽獎舞台：依獎項設定的動畫樣式切換 -->
-            <component
-              :is="stageComponent"
-              :key="stageKey"
-              ref="stageRef"
-              :ctx="ctx"
-              :prize="activePrize"
-              :pool="availablePool"
-              :winners="currentWinnerPeople"
-            ></component>
+            <div class="lt-stage">
+              <component
+                :is="stageComponent"
+                :key="stageKey"
+                ref="stageRef"
+                :ctx="ctx"
+                :prize="activePrize"
+                :pool="availablePool"
+                :winners="currentWinnerPeople"
+              ></component>
+            </div>
 
-            <div class="mt-4 flex flex-col items-center gap-4 shrink-0">
-              <div
-                class="w-full glass-panel rounded-[2.5rem] p-4 min-h-[90px] max-h-[22vh] overflow-y-auto shadow-inner"
-              >
-                <transition-group name="list" tag="div" class="flex flex-wrap justify-center gap-3">
-                  <div
-                    v-for="win in currentWinners"
-                    :key="win.id || win.seed"
-                    class="bg-white/20 border border-yellow-500/30 px-6 py-2 rounded-2xl text-center shadow-xl"
-                  >
-                    <div class="text-2xl font-black text-yellow-300 leading-tight">{{ win.winner }}</div>
-                    <div v-if="win.winnerId" class="text-[11px] font-mono opacity-50">
-                      {{ win.winnerId }}
-                    </div>
+            <!-- 下方：已中獎名單 + 操作提示 -->
+            <div class="lt-bottom">
+              <div class="lt-ribbon">
+                <span class="lt-ribbon-lbl">已中獎</span>
+                <transition-group name="list" tag="div" class="lt-chips">
+                  <div v-for="win in currentWinners" :key="win.id || win.seed" class="lt-chip">
+                    <b>{{ win.winner }}</b>
+                    <span v-if="win.winnerId">{{ win.winnerId }}</span>
                   </div>
                 </transition-group>
+                <div v-if="!currentWinners.length" class="lt-chip lt-chip-empty">本獎項尚無中獎者</div>
               </div>
-
-              <div class="text-center pb-1">
-                <p
-                  class="text-white/40 uppercase tracking-[0.4em] text-sm font-bold animate-pulse mb-3"
-                >
-                  {{ hint }}
-                </p>
-                <button
-                  v-if="!isBusy && currentWinners.length > 0"
-                  @click="confirmRedraw"
-                  class="text-xs font-bold text-red-400 hover:text-red-300 px-4 py-1 border border-red-500/30 rounded-full transition"
-                >
-                  ↺ 清除紀錄並重抽
-                </button>
+              <div class="lt-hint">
+                <template v-for="(part, i) in hintParts" :key="i">
+                  <span v-if="part.key" class="lt-kbd">{{ part.text }}</span>
+                  <span v-else>{{ part.text }}</span>
+                </template>
               </div>
+              <button
+                v-if="!isBusy && currentWinners.length > 0"
+                @click="confirmRedraw"
+                class="lt-redraw"
+                title="清除此獎項的中獎紀錄並重抽"
+              >
+                ↺ 重抽
+              </button>
             </div>
           </div>
           <div
@@ -381,7 +402,7 @@
         <button
           v-if="isPresenting"
           @click="exitPresentation"
-          title="離開抽獎 (F / Esc)"
+          title="離開抽獎 (Esc)"
           aria-label="離開抽獎"
           class="fixed top-4 right-4 z-50 w-11 h-11 rounded-full glass-panel text-lg opacity-20 hover:opacity-100 transition"
         >
@@ -395,7 +416,7 @@
           @click.self="closePreview"
         >
           <div
-            :class="['relative w-full max-w-6xl h-[88vh] rounded-[2rem] border border-white/20 shadow-2xl overflow-hidden flex flex-col bg-gradient-to-br', themeClasses[state.config.theme]?.grad || 'from-zinc-900 to-black']"
+            class="app-bg relative w-full max-w-6xl h-[88vh] rounded-[2rem] border border-white/20 shadow-2xl overflow-hidden flex flex-col"
           >
             <div
               class="shrink-0 flex flex-wrap items-center gap-3 px-6 py-3 border-b border-white/10 bg-black/30"

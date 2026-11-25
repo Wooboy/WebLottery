@@ -4,7 +4,7 @@ import { sample, shuffle } from './lib/random.js'
 import { parseParticipants } from './lib/participants.js'
 import { sfx, setSoundEnabled } from './lib/sound.js'
 import { confetti, clearConfetti } from './lib/confetti.js'
-import { STAGES, DEFAULT_STAGE, stageOf, parseStageKey } from './stages/index.js'
+import { STAGES, DEFAULT_STAGE, stageOf, parseStageKey, normalizeStageKey } from './stages/index.js'
 
 const STORAGE_KEY = 'lottery_app_v2026_data'
 
@@ -22,13 +22,28 @@ createApp({
     let toastTimer = null
 
     // 色系主題對照表
+    // 色系主題：底色固定深色，主題色只作為點綴（光暈、邊框、轉盤、牌背…）；金色保留給中獎者
     const themeClasses = {
-      red: { grad: 'from-red-950 via-red-900 to-red-800', btn: 'bg-red-600' },
-      black: { grad: 'from-zinc-950 via-zinc-900 to-black', btn: 'bg-zinc-800' },
-      blue: { grad: 'from-blue-950 via-blue-900 to-blue-800', btn: 'bg-blue-600' },
-      green: { grad: 'from-emerald-950 via-emerald-900 to-emerald-800', btn: 'bg-emerald-600' },
-      yellow: { grad: 'from-amber-950 via-amber-900 to-amber-700', btn: 'bg-amber-500' },
+      red: { label: '紅', accent: '#e23d3d', accent2: '#7f1d1d', swatch: '#e23d3d' },
+      black: { label: '黑', accent: '#a1a1aa', accent2: '#27272a', swatch: '#3f3f46' },
+      blue: { label: '藍', accent: '#3b82f6', accent2: '#1e3a8a', swatch: '#3b82f6' },
+      green: { label: '綠', accent: '#10b981', accent2: '#064e3b', swatch: '#10b981' },
+      yellow: { label: '金', accent: '#f59e0b', accent2: '#78350f', swatch: '#f59e0b' },
     }
+    const themeVars = computed(() => {
+      const t = themeClasses[state.config.theme] || themeClasses.red
+      return { '--accent': t.accent, '--accent-2': t.accent2 }
+    })
+
+    // 操作提示：「[空白鍵]」這類片段畫成按鍵樣式
+    const hintParts = computed(() =>
+      hint.value
+        .split(/(\[[^\]]+\])/)
+        .filter(Boolean)
+        .map((t) =>
+          /^\[.+\]$/.test(t) ? { key: true, text: t.slice(1, -1) } : { key: false, text: t },
+        ),
+    )
 
     function newPrize(fields = {}) {
       return {
@@ -48,7 +63,7 @@ createApp({
       rawParticipants: '',
       prizes: [newPrize({ name: '壹等獎', reward: '神秘獎品' })],
       results: [],
-      config: { theme: 'red', sound: true, effects: true },
+      config: { theme: 'red', sound: true, effects: true, idLength: 4 },
       currentIndex: 0,
     }
 
@@ -69,7 +84,9 @@ createApp({
       }
       // 舊版存檔補上新欄位的預設值
       state.config = { ...defaultState.config, ...state.config }
-      state.prizes = (Array.isArray(state.prizes) ? state.prizes : []).map((p) => newPrize(p))
+      state.prizes = (Array.isArray(state.prizes) ? state.prizes : []).map((p) =>
+        newPrize({ ...p, style: normalizeStageKey(p.style) }),
+      )
       // 存檔中的獎項位置若超出範圍（例如曾刪除獎項），回到第一個獎項
       if (!(state.currentIndex >= 0 && state.currentIndex < state.prizes.length)) {
         state.currentIndex = 0
@@ -98,13 +115,51 @@ createApp({
     // 參與人員：每行「ID,顯示名稱」，以 ID 為唯一識別（同名不同人不會互相影響）
     const parsedParticipants = computed(() => parseParticipants(state.rawParticipants))
     const participantsAll = computed(() => parsedParticipants.value.people)
-    const participantErrors = computed(() => parsedParticipants.value.errors)
+    // 老虎機（員編轉輪）需要固定長度、只含英數字的員編；有獎項使用老虎機時才檢查
+    const usesSlot = computed(() => state.prizes.some((p) => p.style === 'slot'))
+    const idLength = computed(() => Math.min(5, Math.max(3, Number(state.config.idLength) || 4)))
+    const slotIdErrors = computed(() => {
+      if (!usesSlot.value) return []
+      const L = idLength.value
+      const re = new RegExp(`^[A-Za-z0-9]{${L}}$`)
+      return parsedParticipants.value.people
+        .filter((p) => !re.test(p.id))
+        .map((p) => ({
+          lineNo: p.lineNo,
+          text: `${p.id},${p.name}`,
+          reason: `老虎機需要 ${L} 碼英數字員編（目前為「${p.id}」）`,
+        }))
+    })
+    const participantErrors = computed(() =>
+      [...parsedParticipants.value.errors, ...slotIdErrors.value].sort(
+        (a, b) => a.lineNo - b.lineNo,
+      ),
+    )
 
     // 已開始抽獎（有任何中獎紀錄）就鎖定名單，避免抽獎中途名單變動；
     // 「清空中獎名單」後才解除。名單格式有錯時不鎖定，讓舊資料可以修正。
     const isListLocked = computed(
       () => state.results.length > 0 && participantErrors.value.length === 0,
     )
+
+    // 名單編輯框：行號、錯誤行標示、跳到指定行
+    const listEl = ref(null)
+    const listScrollTop = ref(0)
+    const listLineCount = computed(() => Math.max(1, state.rawParticipants.split(/\r?\n/).length))
+    const errorLineSet = computed(() => new Set(participantErrors.value.map((e) => e.lineNo)))
+    function jumpToLine(lineNo) {
+      const el = listEl.value
+      if (!el) return
+      const lines = state.rawParticipants.split(/\r?\n/)
+      let start = 0
+      for (let i = 0; i < lineNo - 1 && i < lines.length; i++) start += lines[i].length + 1
+      const end = start + (lines[lineNo - 1] || '').length
+      el.focus()
+      el.setSelectionRange(start, end)
+      const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 22
+      el.scrollTop = Math.max(0, (lineNo - 1) * lineHeight - el.clientHeight / 2)
+      listScrollTop.value = el.scrollTop
+    }
 
     function shuffleParticipants() {
       if (isListLocked.value) return
@@ -236,10 +291,13 @@ createApp({
     // --- 抽獎動畫預覽（設定頁）---
     // 以獎項的實際設定（動畫樣式、名額、抽獎模式）模擬抽獎，結果只存在預覽視窗，不寫入中獎紀錄。
     // 名單：使用已輸入的參與人員（忽略正式中獎紀錄）；尚未輸入或格式有誤時使用示範名單。
-    const DEMO_PEOPLE = Array.from({ length: 30 }, (_, i) => ({
-      id: `DEMO${String(i + 1).padStart(2, '0')}`,
-      name: `示範人員 ${String(i + 1).padStart(2, '0')}`,
-    }))
+    // 示範人員的 ID 長度跟隨「員編長度」設定，老虎機也能預覽
+    const DEMO_PEOPLE = computed(() =>
+      Array.from({ length: 30 }, (_, i) => ({
+        id: 'D' + String(i + 1).padStart(idLength.value - 1, '0'),
+        name: `示範人員 ${String(i + 1).padStart(2, '0')}`,
+      })),
+    )
     const previewIndex = ref(-1)
     const previewWinners = ref([])
     const previewEpoch = ref(0)
@@ -252,7 +310,7 @@ createApp({
       () => participantsAll.value.length === 0 || participantErrors.value.length > 0,
     )
     const previewPool = computed(() => {
-      const base = previewUsesDemo.value ? DEMO_PEOPLE : participantsAll.value
+      const base = previewUsesDemo.value ? DEMO_PEOPLE.value : participantsAll.value
       const won = new Set(previewWinners.value.map((p) => p.id))
       return base.filter((p) => !won.has(p.id))
     })
@@ -304,7 +362,7 @@ createApp({
     }
 
     // --- 鍵盤操作 ---
-    // F：進入 / 離開抽獎模式（全螢幕）；Esc：離開抽獎模式
+    // 抽獎模式中：Esc 離開
     // 抽獎模式中：空白鍵 / Enter 抽獎；PageUp / PageDown 上一個 / 下一個獎項
     const ACTION_KEYS = ['Space', 'Enter', 'NumpadEnter']
 
@@ -324,14 +382,12 @@ createApp({
           e.preventDefault()
           if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur()
           if (!e.repeat) previewPress()
+        } else if (!e.repeat && previewStageRef.value?.key?.(e.code)) {
+          e.preventDefault()
         }
         return
       }
-      if (e.code === 'KeyF') {
-        e.preventDefault()
-        if (!e.repeat) togglePresentation()
-        return
-      }
+      // 進入抽獎模式只能按右上角「開始抽獎」，避免輸入時誤觸
       if (!isPresenting.value) return
       if (e.code === 'Escape') {
         // 真正全螢幕時 Esc 由瀏覽器處理（觸發 fullscreenchange）；這裡處理無法全螢幕時的視窗模式
@@ -353,6 +409,9 @@ createApp({
       } else if (e.code === 'PageDown') {
         e.preventDefault()
         if (!e.repeat) nextPrize()
+      } else if (!e.repeat && stageRef.value?.key?.(e.code)) {
+        // 舞台自訂按鍵（例如選堆的數字鍵 1～9）
+        e.preventDefault()
       }
     }
 
@@ -380,9 +439,6 @@ createApp({
     function exitPresentation() {
       isPresenting.value = false
       if (document.fullscreenElement) document.exitFullscreen?.()
-    }
-    function togglePresentation() {
-      isPresenting.value ? exitPresentation() : enterPresentation()
     }
     function onFullscreenChange() {
       isFullscreen.value = !!document.fullscreenElement
@@ -501,6 +557,8 @@ createApp({
         { id: 'results', name: '🏆 中獎清單' },
       ],
       themeClasses,
+      themeVars,
+      hintParts,
       stages: STAGES,
       stageOf,
       state,
@@ -510,6 +568,12 @@ createApp({
       toast,
       participantsAll,
       participantErrors,
+      listEl,
+      listScrollTop,
+      listLineCount,
+      errorLineSet,
+      jumpToLine,
+      usesSlot,
       isListLocked,
       shuffleParticipants,
       availablePool,

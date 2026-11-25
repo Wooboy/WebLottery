@@ -30,6 +30,28 @@ function ensureCanvas() {
   })
   document.body.appendChild(canvas)
   ctx2d = canvas.getContext('2d')
+  // 視窗大小改變（例如進入 / 離開全螢幕）時重設畫布尺寸，重設本身也會清空畫布
+  window.addEventListener('resize', () => {
+    if (rafId) resize()
+  })
+}
+
+// 清空整張畫布：以畫布實際像素尺寸清除，不受目前視窗大小影響。
+// （離開全螢幕時視窗已先縮小，若用 innerWidth / innerHeight 清除，只會清掉左上角一部分）
+function clearAll() {
+  if (!ctx2d) return
+  ctx2d.save()
+  ctx2d.setTransform(1, 0, 0, 1, 0, 0)
+  ctx2d.clearRect(0, 0, canvas.width, canvas.height)
+  ctx2d.restore()
+}
+
+function stop() {
+  particles = []
+  if (rafId) cancelAnimationFrame(rafId)
+  rafId = 0
+  clearAll()
+  if (canvas) canvas.style.display = 'none'
 }
 
 function resize() {
@@ -63,7 +85,7 @@ function frame(now) {
   lastTime = now
   const W = window.innerWidth
   const H = window.innerHeight
-  ctx2d.clearRect(0, 0, W, H)
+  clearAll()
   particles = particles.filter((p) => p.y < H + 40 && p.x > -60 && p.x < W + 60)
   for (const p of particles) {
     p.vy += 900 * dt
@@ -83,13 +105,13 @@ function frame(now) {
   if (particles.length) {
     rafId = requestAnimationFrame(frame)
   } else {
-    rafId = 0
-    ctx2d.clearRect(0, 0, W, H)
+    stop()
   }
 }
 
 export function confetti({ big = false } = {}) {
   ensureCanvas()
+  canvas.style.display = 'block'
   resize()
   const W = window.innerWidth
   const H = window.innerHeight
@@ -109,8 +131,5 @@ export function confetti({ big = false } = {}) {
 
 // 立即清除畫面上的彩帶（例如離開抽獎模式時）
 export function clearConfetti() {
-  particles = []
-  if (rafId) cancelAnimationFrame(rafId)
-  rafId = 0
-  if (ctx2d) ctx2d.clearRect(0, 0, window.innerWidth, window.innerHeight)
+  stop()
 }

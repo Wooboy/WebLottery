@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>抽獎畫面改版提案</title>
+<style>
+  :root {
+    --accent: #e23d3d;
+    --accent-2: #7f1d1d;
+    --gold: #f5c542;
+    --gold-soft: rgba(245, 197, 66, 0.16);
+    --ink: #0b0d14;
+    --ink-2: #141824;
+    --line: rgba(255, 255, 255, 0.1);
+    --text: #f5f6fa;
+    --muted: rgba(245, 246, 250, 0.55);
+    --font: 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9eaee; color: #1b1d24; font-family: var(--font); }
+  .doc { max-width: 1240px; margin: 0 auto; padding: 32px 20px 80px; }
+  .doc h1 { font-size: 26px; margin: 0 0 6px; }
+  .doc > p { color: #555a66; margin: 0 0 20px; line-height: 1.7; }
+  .toolbar { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: #e9eaeeee; padding: 10px 0 14px; }
+  .toolbar span { font-size: 14px; color: #555a66; }
+  .swatch { width: 34px; height: 34px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+  .swatch.on { border-color: #1b1d24; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(540px, 1fr)); gap: 28px; }
+  figure { margin: 0; }
+  figcaption { font-size: 15px; font-weight: 700; margin: 0 0 8px; display: flex; gap: 8px; align-items: baseline; }
+  figcaption small { font-weight: 400; color: #666b77; font-size: 13px; }
+  .notes { font-size: 13px; color: #555a66; line-height: 1.7; margin: 8px 0 0; padding-left: 18px; }
+
+  /* ===== 16:9 畫面 ===== */
+  .screen { container-type: inline-size; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; position: relative;
+    color: var(--text); background: var(--ink);
+    background-image: radial-gradient(120% 70% at 50% -10%, color-mix(in srgb, var(--accent) 42%, transparent), transparent 60%),
+      radial-gradient(80% 60% at 50% 120%, color-mix(in srgb, var(--accent-2) 35%, transparent), transparent 70%);
+    display: grid; grid-template-rows: 15cqw 1fr 9.5cqw; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+  .top { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 3cqw; padding: 0 3.5cqw; border-bottom: 1px solid var(--line); }
+  .order { font-size: 1.3cqw; color: var(--muted); letter-spacing: .1em; }
+  .order b { color: var(--text); font-size: 2.1cqw; letter-spacing: 0; }
+  .dots { display: flex; gap: .5cqw; margin-top: .8cqw; }
+  .dots i { width: 1.6cqw; height: .45cqw; border-radius: 1cqw; background: var(--line); }
+  .dots i.done { background: color-mix(in srgb, var(--accent) 70%, white); }
+  .dots i.now { background: var(--gold); width: 3cqw; }
+  .title { display: flex; align-items: center; gap: 2cqw; min-width: 0; }
+  .tier { flex-shrink: 0; display: inline-block; font-size: 1.8cqw; font-weight: 700; padding: .3cqw 1.4cqw; border-radius: 3cqw;
+    background: color-mix(in srgb, var(--accent) 30%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 70%, white); letter-spacing: .15em; }
+  .reward { font-size: 4.6cqw; font-weight: 900; line-height: 1.15; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { font-size: 1.2cqw; color: var(--muted); margin-top: .3cqw; }
+  .count { justify-self: end; text-align: right; }
+  .count .lbl { font-size: 1.2cqw; color: var(--muted); letter-spacing: .15em; }
+  .count .num { font-size: 5cqw; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
+  .count .num small { font-size: 2cqw; color: var(--muted); font-weight: 700; }
+  .stage { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; overflow: hidden; }
+  .bottom { display: flex; align-items: center; gap: 2cqw; padding: 0 3cqw; border-top: 1px solid var(--line); background: rgba(0,0,0,.25); }
+  .ribbon { flex: 1; display: flex; gap: 1cqw; overflow: hidden; align-items: center; }
+  .ribbon .lbl { font-size: 1.1cqw; color: var(--muted); writing-mode: vertical-rl; letter-spacing: .2em; }
+  .chip { padding: .6cqw 1.4cqw; border-radius: .8cqw; background: var(--gold-soft); border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); text-align: center; white-space: nowrap; }
+  .chip b { display: block; font-size: 2cqw; color: var(--gold); line-height: 1.2; }
+  .chip span { font-size: 1cqw; color: var(--muted); font-family: Consolas, monospace; }
+  .chip.empty { background: transparent; border-style: dashed; border-color: var(--line); color: var(--muted); font-size: 1.3cqw; padding: 1.4cqw 2cqw; }
+  .key { display: flex; align-items: center; gap: .8cqw; font-size: 1.3cqw; color: var(--muted); white-space: nowrap; }
+  .kbd { font-size: 1.2cqw; font-weight: 700; color: var(--text); padding: .4cqw 1.2cqw; border-radius: .6cqw; border: 1px solid rgba(255,255,255,.35); border-bottom-width: .35cqw; }
+  .gold { color: var(--gold); }
+
+  /* 經典 */
+  .classic { text-align: center; }
+  .classic .ghost { font-size: 4cqw; font-weight: 900; color: rgba(255,255,255,.12); line-height: 1.1; }
+  .classic .big { font-size: 11cqw; font-weight: 900; line-height: 1.05; letter-spacing: .02em; }
+  .classic .id { font-size: 1.5cqw; color: var(--muted); font-family: Consolas, monospace; margin-top: .5cqw; }
+
+  /* 老虎機 */
+  .slots { display: flex; gap: 2cqw; padding: 2cqw 3cqw; border-radius: 2cqw; background: rgba(0,0,0,.35); border: 1px solid var(--line); position: relative; }
+  .slots::before { content: ''; position: absolute; left: 1.5cqw; right: 1.5cqw; top: 50%; height: 2px; background: var(--gold); opacity: .55; }
+  .reel { width: 18cqw; height: 22cqw; border-radius: 1.2cqw; background: linear-gradient(#0000, rgba(255,255,255,.06) 50%, #0000); border: 1px solid var(--line);
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1.4cqw; overflow: hidden; }
+  .reel div { font-size: 2.6cqw; font-weight: 900; color: rgba(255,255,255,.18); }
+  .reel div.c { font-size: 4.4cqw; color: var(--text); }
+  .reel.landed { border-color: var(--gold); background: var(--gold-soft); }
+  .reel.landed div.c { color: var(--gold); }
+
+  /* 轉盤 */
+  .wheelwrap { display: flex; align-items: center; gap: 5cqw; }
+  .wheel { width: 30cqw; height: 30cqw; }
+  .result { min-width: 24cqw; padding: 2cqw 2.6cqw; border-radius: 1.6cqw; background: var(--gold-soft); border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); }
+  .result .lbl { font-size: 1.2cqw; color: var(--muted); letter-spacing: .2em; }
+  .result .nm { font-size: 6cqw; font-weight: 900; color: var(--gold); line-height: 1.1; }
+  .result .id { font-size: 1.4cqw; color: var(--muted); font-family: Consolas, monospace; }
+
+  /* 淘汰 */
+  .elim { width: 90%; }
+  .elim .bar { display: flex; justify-content: space-between; font-size: 1.4cqw; color: var(--muted); margin-bottom: 1.2cqw; }
+  .elim .bar b { color: var(--text); font-size: 2cqw; }
+  .elim .cells { display: grid; grid-template-columns: repeat(10, 1fr); gap: .7cqw; }
+  .cell { font-size: 1.35cqw; font-weight: 700; text-align: center; padding: .7cqw 0; border-radius: .6cqw; background: rgba(255,255,255,.08); border: 1px solid var(--line); }
+  .cell.out { opacity: .14; text-decoration: line-through; }
+  .cell.alive { background: color-mix(in srgb, var(--accent) 35%, transparent); border-color: color-mix(in srgb, var(--accent) 80%, white); }
+  .cell.win { background: var(--gold); color: #3b2a00; border-color: var(--gold); transform: scale(1.15); }
+
+  /* 選堆 */
+  .piles { width: 92%; }
+  .piles .bar { display: flex; justify-content: space-between; align-items: baseline; font-size: 1.4cqw; color: var(--muted); margin-bottom: 1.6cqw; }
+  .piles .bar b { color: var(--text); font-size: 2cqw; }
+  .rounds { display: flex; gap: .6cqw; align-items: center; }
+  .rounds i { font-style: normal; padding: .2cqw 1cqw; border-radius: 2cqw; border: 1px solid var(--line); font-size: 1.1cqw; }
+  .rounds i.now { border-color: var(--gold); color: var(--gold); }
+  .rounds i.done { background: rgba(255,255,255,.08); color: var(--text); }
+  .pilerow { display: flex; justify-content: center; gap: 3cqw; }
+  .pile { width: 15cqw; text-align: center; }
+  .stack { position: relative; height: 15cqw; }
+  .stack .cd { position: absolute; left: 50%; width: 10cqw; height: 13.3cqw; margin-left: -5cqw; border-radius: 1cqw;
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,.06) 0 .6cqw, transparent .6cqw 1.2cqw), color-mix(in srgb, var(--accent) 45%, var(--ink));
+    border: 1px solid color-mix(in srgb, var(--accent) 70%, white); }
+  .pile .lbl { margin-top: 1cqw; font-size: 3cqw; font-weight: 900; }
+  .pile .n { font-size: 1.2cqw; color: var(--muted); }
+  .pile.pick .cd { border-color: var(--gold); box-shadow: 0 0 0 .3cqw var(--gold-soft); }
+  .pile.pick .lbl { color: var(--gold); }
+  .pile.out { opacity: .2; }
+  .fan { display: flex; justify-content: center; gap: 1.4cqw; }
+  .fan .cd2 { width: 11cqw; aspect-ratio: 3 / 4; border-radius: 1cqw; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.06); border: 1px solid var(--line); font-weight: 900; font-size: 2.2cqw; color: rgba(255,255,255,.35); }
+  .fan .cd2 span { font-size: 1cqw; font-family: Consolas, monospace; font-weight: 400; color: var(--muted); }
+  .fan .cd2.win { background: var(--gold-soft); border: 2px solid var(--gold); color: var(--gold); transform: translateY(-1.5cqw) scale(1.1); }
+
+  /* 老虎機：員編轉輪 */
+  .idslot { display: flex; flex-direction: column; align-items: center; gap: 2cqw; }
+  .idreels { display: flex; gap: 1.2cqw; padding: 1.6cqw 2cqw; border-radius: 2cqw; background: rgba(0,0,0,.35); border: 1px solid var(--line); position: relative; }
+  .idreels::before, .idreels::after { content: ''; position: absolute; top: 50%; margin-top: -1cqw; border: 1cqw solid transparent; }
+  .idreels::before { left: -.6cqw; border-left: 1.4cqw solid var(--gold); }
+  .idreels::after { right: -.6cqw; border-right: 1.4cqw solid var(--gold); }
+  .ch { width: 9cqw; height: 15cqw; border-radius: 1cqw; border: 1px solid var(--line); background: linear-gradient(#0000, rgba(255,255,255,.07) 50%, #0000);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6cqw; font-family: Consolas, 'Courier New', monospace; font-weight: 700; overflow: hidden; }
+  .ch div { font-size: 3cqw; color: rgba(255,255,255,.18); line-height: 1; }
+  .ch div.c { font-size: 7.5cqw; color: var(--text); }
+  .ch.lock { border-color: var(--gold); background: var(--gold-soft); }
+  .ch.lock div.c { color: var(--gold); }
+  .ch.spin div.c { filter: blur(.25cqw); opacity: .8; }
+  .match { font-size: 1.4cqw; color: var(--muted); }
+  .match b { color: var(--text); }
+  .reveal-name { font-size: 7cqw; font-weight: 900; color: var(--gold); line-height: 1; }
+
+  /* 翻牌 */
+  .cards { display: grid; grid-template-columns: repeat(6, 9.5cqw); gap: 1.4cqw; }
+  .card { aspect-ratio: 3 / 4; border-radius: 1cqw; display: flex; align-items: center; justify-content: center; font-weight: 900;
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,.06) 0 .6cqw, transparent .6cqw 1.2cqw), color-mix(in srgb, var(--accent) 45%, var(--ink));
+    border: 1px solid color-mix(in srgb, var(--accent) 70%, white); font-size: 3cqw; color: rgba(255,255,255,.75); }
+  .card.open { background: var(--gold-soft); border: 2px solid var(--gold); color: var(--gold); font-size: 1.9cqw; flex-direction: column; }
+  .card.open span { font-size: 1cqw; color: var(--muted); font-family: Consolas, monospace; font-weight: 400; }
+
+  /* 倒數 */
+  .ring { width: 28cqw; height: 28cqw; position: relative; display: flex; align-items: center; justify-content: center; }
+  .ring svg { position: absolute; inset: 0; }
+  .ring b { font-size: 16cqw; font-weight: 900; line-height: 1; }
+
+  /* 扭蛋 */
+  .gacha { display: flex; align-items: center; gap: 6cqw; }
+  .machine { width: 22cqw; position: relative; }
+  .dome { width: 22cqw; height: 22cqw; border-radius: 50%; border: .35cqw solid rgba(255,255,255,.35); background: rgba(255,255,255,.06); position: relative; overflow: hidden; }
+  .ball { position: absolute; width: 4cqw; height: 4cqw; border-radius: 50%; border: 1px solid rgba(0,0,0,.25); }
+  .body { width: 18cqw; height: 10cqw; margin: -1.5cqw auto 0; border-radius: 0 0 2cqw 2cqw; background: color-mix(in srgb, var(--accent) 75%, var(--ink)); border: 1px solid color-mix(in srgb, var(--accent) 60%, white); position: relative; }
+  .knob { position: absolute; left: 2cqw; top: 2.5cqw; width: 4.6cqw; height: 4.6cqw; border-radius: 50%; border: .4cqw solid rgba(255,255,255,.75); }
+  .chute { position: absolute; right: 2cqw; top: 3.4cqw; width: 6cqw; height: 4.6cqw; border-radius: 1cqw; background: rgba(0,0,0,.5); }
+
+  /* 現況 */
+  .old { background: linear-gradient(135deg, #450a0a, #7f1d1d 50%, #991b1b) !important; display: flex; flex-direction: column; padding: 2.4cqw; gap: 1.6cqw; }
+  .old .hdr { border-radius: 4cqw; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); display: flex; align-items: center; justify-content: space-between; padding: 2cqw 2.5cqw; }
+  .old .hdr h3 { margin: 0; font-size: 6cqw; font-weight: 900; text-align: center; text-shadow: 0 0 2cqw rgba(255,255,255,.4); }
+  .old .hdr p { margin: .3cqw 0 0; font-size: 1.5cqw; font-style: italic; opacity: .7; text-align: center; }
+  .old .pills { text-align: center; margin-top: .8cqw; }
+  .old .pills span { display: inline-block; font-size: 1cqw; padding: .2cqw 1cqw; border-radius: 2cqw; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); margin: 0 .3cqw; }
+  .old .mid { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 9cqw; font-weight: 900; color: #fde047; text-shadow: 0 0 2cqw rgba(253,224,71,.5); }
+  .old .win { border-radius: 3cqw; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15); padding: 1.4cqw; text-align: center; }
+  .old .win span { display: inline-block; font-size: 1.8cqw; font-weight: 900; color: #fde047; background: rgba(255,255,255,.2); padding: .5cqw 1.6cqw; border-radius: 1.2cqw; }
+  .old .hint { text-align: center; font-size: 1cqw; letter-spacing: .4em; opacity: .4; }
+</style>
+</head>
+<body>
+<div class="doc">
+  <h1>抽獎畫面改版提案（靜態示意）</h1>
+  <p>每張圖為 16:9 投影畫面的等比例縮小。上方切換色系可看到同一套版面在不同主題下的效果。此檔僅供討論，與實際程式無關。</p>
+
+  <div class="toolbar">
+    <span>主題色系：</span>
+    <div class="swatch on" data-a="#e23d3d" data-b="#7f1d1d" style="background:#e23d3d" title="紅"></div>
+    <div class="swatch" data-a="#3b82f6" data-b="#1e3a8a" style="background:#3b82f6" title="藍"></div>
+    <div class="swatch" data-a="#10b981" data-b="#064e3b" style="background:#10b981" title="綠"></div>
+    <div class="swatch" data-a="#f59e0b" data-b="#78350f" style="background:#f59e0b" title="金"></div>
+    <div class="swatch" data-a="#a1a1aa" data-b="#27272a" style="background:#3f3f46" title="黑"></div>
+  </div>
+
+  <div class="grid">
+
+    <figure>
+      <figcaption>0. 現況（對照用） <small>目前的抽獎畫面</small></figcaption>
+      <div class="screen old">
+        <div class="hdr"><span style="font-size:3cqw">❮</span>
+          <div><h3>頭獎</h3><p>Reward: iPhone 17 Pro</p><div class="pills"><span>剩餘：0 / 1</span><span>🎲 經典跳字</span></div></div>
+          <span style="font-size:3cqw">❯</span></div>
+        <div class="mid">王小明</div>
+        <div class="win"><span>王小明</span></div>
+        <div class="hint">按 [空白鍵] 開始抽獎</div>
+      </div>
+      <ul class="notes">
+        <li>標題卡片佔掉約 1/3 高度，舞台被壓縮</li>
+        <li>獎品（觀眾最在意）只是斜體小字，還有英文「Reward:」</li>
+        <li>整片同色漸層＋白色玻璃，各玩法自帶的彩色（轉盤彩虹、紅色扭蛋機）與主題打架</li>
+        <li>提示文字 40% 透明、字距很寬，投影後幾乎看不到</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>1. 經典跳字 <small>揭曉後</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">貳 等 獎</span><div class="reward">Dyson 吸塵器</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">2<small> / 5</small></div></div>
+        </div>
+        <div class="stage classic">
+          <div><div class="ghost">陳美玲</div><div class="big gold">林志豪</div><div class="id">E142</div><div class="ghost">張雅婷</div></div>
+        </div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span>
+            <div class="chip"><b>王小明</b><span>E101</span></div><div class="chip"><b>李大華</b><span>E123</span></div><div class="chip"><b>林志豪</b><span>E142</span></div>
+          </div>
+          <div class="key"><span class="kbd">␣ Space</span>抽出下一位</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>上方改為三欄：左「第幾個獎項＋進度」、中「獎項等級＋獎品大字」、右「剩餘名額大數字」</li>
+        <li>中獎者名字下方加 ID，同名時現場可以分辨</li>
+        <li>跳動時上下帶淡淡的殘影名字，增加速度感</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>2-a. 老虎機（員編轉輪） <small>前 2 碼已停，後 2 碼轉動中</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">肆 等 獎</span><div class="reward">全聯禮券 3,000 元</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">3<small> / 3</small></div></div>
+        </div>
+        <div class="stage">
+          <div class="idslot">
+            <div class="idreels">
+              <div class="ch lock"><div>D</div><div class="c">E</div><div>F</div></div>
+              <div class="ch lock"><div>0</div><div class="c">1</div><div>2</div></div>
+              <div class="ch spin"><div>Q</div><div class="c">7</div><div>K</div></div>
+              <div class="ch spin"><div>3</div><div class="c">X</div><div>9</div></div>
+            </div>
+            <div class="match">目前符合 <b>E1 _ _</b> 的還有 <b>37</b> 人</div>
+          </div>
+        </div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span><div class="chip empty">本獎項尚無中獎者</div></div>
+          <div class="key">轉輪依序停止中…</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>一次只抽一位；轉輪數 = 員編長度（3～5 碼，設定時固定），每輪在 A–Z、0–9 間轉動</li>
+        <li>由左到右依序停下，每停一碼就顯示「還有幾人符合」，製造懸念</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>2-b. 老虎機（員編轉輪） <small>全部停下，帶出人名</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">肆 等 獎</span><div class="reward">全聯禮券 3,000 元</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">2<small> / 3</small></div></div>
+        </div>
+        <div class="stage">
+          <div class="idslot">
+            <div class="idreels">
+              <div class="ch lock"><div>D</div><div class="c">E</div><div>F</div></div>
+              <div class="ch lock"><div>0</div><div class="c">1</div><div>2</div></div>
+              <div class="ch lock"><div>3</div><div class="c">4</div><div>5</div></div>
+              <div class="ch lock"><div>1</div><div class="c">2</div><div>3</div></div>
+            </div>
+            <div class="reveal-name">林志豪</div>
+          </div>
+        </div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span><div class="chip"><b>林志豪</b><span>E142</span></div></div>
+          <div class="key"><span class="kbd">␣ Space</span>抽下一位</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>員編全部確定後，轉輪下方才浮現名字（金色大字）</li>
+        <li>名額多於 1 時，每按一次抽一位；設成「一次抽完」則自動連續轉到滿</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>3. 幸運轉盤 <small>停在中獎者</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">壹 等 獎</span><div class="reward">MacBook Air</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">0<small> / 1</small></div></div>
+        </div>
+        <div class="stage">
+          <div class="wheelwrap">
+            <svg class="wheel" viewBox="-100 -108 200 208" id="wheel"></svg>
+            <div class="result"><div class="lbl">恭喜中獎</div><div class="nm">陳美玲</div><div class="id">E117</div></div>
+          </div>
+        </div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span><div class="chip"><b>陳美玲</b><span>E117</span></div></div>
+          <div class="key"><span class="kbd">PgDn</span>下一個獎項</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>扇區改用主題色的深淺兩色交錯，不再是彩虹；只有中獎扇區是金色</li>
+        <li>結果改成右側「中獎卡」，名字＋ID</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>4-a. 選堆（新玩法） <small>第 1 輪：洗牌後分成 4 堆，等老闆挑選</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">特 獎</span><div class="reward">現金 100,000 元</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">1<small> / 1</small></div></div>
+        </div>
+        <div class="stage">
+          <div class="piles">
+            <div class="bar"><span>剩 <b>100</b> 人</span><div class="rounds"><i class="now">第 1 輪 · 4 堆</i><i>第 2 輪</i><i>第 3 輪</i></div></div>
+            <div class="pilerow" id="piles1"></div>
+          </div>
+        </div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span><div class="chip empty">請老闆選一堆</div></div>
+          <div class="key">點選牌堆 或 <span class="kbd">1</span>～<span class="kbd">4</span></div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>先把目前所有可抽人員攤開展示（約 2 秒），接著蓋牌、洗牌、平均分成 N 堆（N = 3～5，依人數自動決定）</li>
+        <li>老闆選中的那一堆留下，其餘淘汰；留下的再洗牌分堆，進入下一輪</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>4-b. 選堆（新玩法） <small>第 3 輪：剩 5 張，選中即揭曉</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">特 獎</span><div class="reward">現金 100,000 元</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">0<small> / 1</small></div></div>
+        </div>
+        <div class="stage">
+          <div class="piles">
+            <div class="bar"><span>剩 <b>5</b> 人</span><div class="rounds"><i class="done">第 1 輪 100→25</i><i class="done">第 2 輪 25→5</i><i class="now">第 3 輪 · 選 1 張</i></div></div>
+            <div class="fan">
+              <div class="cd2">?</div><div class="cd2">?</div>
+              <div class="cd2 win">吳佩珊<span>E131</span></div>
+              <div class="cd2">?</div><div class="cd2">?</div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span><div class="chip"><b>吳佩珊</b><span>E131</span></div></div>
+          <div class="key"><span class="kbd">␣ Space</span>翻開其他牌</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>最後一輪每堆只剩 1 張，選中的那張直接翻開即為中獎者</li>
+        <li>可選擇揭曉後再把其他未選的牌翻開（「差一點就是你」的效果）</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>5. 翻牌 <small>翻開 2 張</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">參 等 獎</span><div class="reward">AirPods Pro</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">1<small> / 3</small></div></div>
+        </div>
+        <div class="stage"><div class="cards" id="cards"></div></div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span><div class="chip"><b>黃建國</b><span>E203</span></div><div class="chip"><b>吳佩珊</b><span>E131</span></div></div>
+          <div class="key">請來賓點選卡牌 或 <span class="kbd">␣ Space</span>隨機翻</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>牌背用主題色＋斜紋，數字大而清楚，方便來賓喊號碼</li>
+        <li>翻開的牌顯示名字＋ID，金框</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>6. 倒數揭曉 <small>倒數中</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">董 事 長 獎</span><div class="reward">日本來回機票</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">1<small> / 1</small></div></div>
+        </div>
+        <div class="stage">
+          <div class="ring">
+            <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/><circle id="ringArc" cx="50" cy="50" r="45" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round" stroke-dasharray="190 283" transform="rotate(-90 50 50)"/></svg>
+            <b>2</b>
+          </div>
+        </div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span><div class="chip empty">揭曉中</div></div>
+          <div class="key">揭曉中…</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>數字外圈加一個倒數圓環（主題色），節奏更明確</li>
+        <li>揭曉時名字逐字出現在圓環中央，下方再淡入 ID</li>
+      </ul>
+    </figure>
+
+    <figure>
+      <figcaption>7. 扭蛋機 <small>扭蛋打開</small></figcaption>
+      <div class="screen">
+        <div class="top">
+          <div class="title"><span class="tier">加 碼 獎</span><div class="reward">紅包 6,666 元</div></div>
+          <div class="count"><div class="lbl">剩餘名額</div><div class="num">4<small> / 5</small></div></div>
+        </div>
+        <div class="stage">
+          <div class="gacha">
+            <div class="machine"><div class="dome" id="dome"></div><div class="body"><div class="knob"></div><div class="chute"></div></div></div>
+            <div class="result"><div class="lbl">恭喜中獎</div><div class="nm">蕭敬騰</div><div class="id">E288</div></div>
+          </div>
+        </div>
+        <div class="bottom">
+          <div class="ribbon"><span class="lbl">已中獎</span><div class="chip"><b>蕭敬騰</b><span>E288</span></div></div>
+          <div class="key">自動連續抽出中…</div>
+        </div>
+      </div>
+      <ul class="notes">
+        <li>機身改用主題色，不再固定紅色；球的顏色降低彩度，避免搶戲</li>
+        <li>結果卡與轉盤共用同一種樣式</li>
+      </ul>
+    </figure>
+
+  </div>
+</div>
+
+<script>
+  const NAMES = '王小明 李大華 陳美玲 林志豪 張雅婷 黃建國 吳佩珊 劉家豪 蔡依林 楊宗緯 許志安 鄭秀文 謝霆鋒 郭富城 洪金寶 曾志偉 周杰倫 蕭敬騰 羅志祥 梁靜茹'.split(' ')
+
+  function drawWheel() {
+    const svg = document.getElementById('wheel')
+    const S = 12, a = 360 / S, r = 96, win = 3
+    const p = (d) => { const t = d * Math.PI / 180; return `${(r * Math.sin(t)).toFixed(2)} ${(-r * Math.cos(t)).toFixed(2)}` }
+    const rot = -(win + 0.5) * a
+    let g = `<g transform="rotate(${rot})">`
+    for (let k = 0; k < S; k++) {
+      const fill = k === win ? 'var(--gold)' : k % 2 ? 'var(--accent)' : 'var(--accent-2)'
+      g += `<path d="M0 0 L${p(k * a)} A${r} ${r} 0 0 1 ${p((k + 1) * a)} Z" fill="${fill}" opacity="${k === win ? 1 : 0.85}" stroke="rgba(255,255,255,.35)" stroke-width=".6"/>`
+      g += `<g transform="rotate(${(k + 0.5) * a})"><text x="0" y="-58" transform="rotate(-90 0 -58)" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="900" fill="${k === win ? '#3b2a00' : '#fff'}">${k === win ? '陳美玲' : NAMES[k]}</text></g>`
+    }
+    g += '</g><circle r="12" fill="#fff"/><circle r="7" fill="var(--gold)"/><path d="M0 -88 L-8 -106 L8 -106 Z" fill="var(--gold)" stroke="#fff" stroke-width="1.5"/>'
+    svg.innerHTML = g
+  }
+
+  function drawPiles() {
+    const box = document.getElementById('piles1')
+    const sizes = [25, 25, 25, 25]
+    box.innerHTML = sizes.map((n, i) => {
+      let cards = ''
+      for (let k = 0; k < 5; k++) cards += `<div class="cd" style="top:${k * 0.35}cqw;transform:translateX(${(k - 2) * 0.25}cqw) rotate(${(k - 2) * 2}deg)"></div>`
+      return `<div class="pile${i === 1 ? ' pick' : ''}"><div class="stack">${cards}</div><div class="lbl">${i + 1}</div><div class="n">${n} 張</div></div>`
+    }).join('')
+  }
+
+  function drawElim() {
+    const box = document.querySelector('#elim .cells')
+    if (!box) return
+    const alive = new Set([7, 18, 33, 46])
+    let html = ''
+    for (let i = 0; i < 60; i++) {
+      const cls = alive.has(i) ? 'alive' : 'out'
+      html += `<div class="cell ${cls}">${NAMES[i % NAMES.length]}</div>`
+    }
+    box.innerHTML = html
+  }
+
+  function drawCards() {
+    const box = document.getElementById('cards')
+    const open = { 2: ['黃建國', 'E203'], 8: ['吳佩珊', 'E131'] }
+    let html = ''
+    for (let i = 0; i < 12; i++) {
+      html += open[i] ? `<div class="card open">${open[i][0]}<span>${open[i][1]}</span></div>` : `<div class="card">${i + 1}</div>`
+    }
+    box.innerHTML = html
+  }
+
+  function drawDome() {
+    const dome = document.getElementById('dome')
+    const tones = ['#e5e7eb', '#cbd5e1', 'var(--gold)', 'color-mix(in srgb, var(--accent) 60%, white)']
+    let html = ''
+    for (let i = 0; i < 14; i++) {
+      const rr = 2 + Math.random() * 6.5, t = Math.random() * Math.PI * 2
+      html += `<div class="ball" style="left:${9 + rr * Math.cos(t)}cqw;top:${10 + rr * Math.sin(t) * .8}cqw;background:linear-gradient(${tones[i % tones.length]} 50%, #f5f5f5 50%)"></div>`
+    }
+    dome.innerHTML = html
+  }
+
+  document.querySelectorAll('.swatch').forEach((s) => s.addEventListener('click', () => {
+    document.querySelectorAll('.swatch').forEach((x) => x.classList.remove('on'))
+    s.classList.add('on')
+    document.documentElement.style.setProperty('--accent', s.dataset.a)
+    document.documentElement.style.setProperty('--accent-2', s.dataset.b)
+  }))
+
+  drawWheel(); drawElim(); drawPiles(); drawCards(); drawDome()
+</script>
+</body>
+</html>
