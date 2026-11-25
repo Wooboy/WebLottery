@@ -196,6 +196,18 @@ html {
   color: var(--muted);
   font-family: Consolas, 'Courier New', monospace;
 }
+.lt-chip-btn {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.lt-chip-btn:hover:not(:disabled) {
+  border-color: var(--gold);
+}
+.lt-chip-btn:disabled {
+  cursor: default;
+}
 .lt-chip-empty {
   background: transparent;
   border-style: dashed;
@@ -670,4 +682,62 @@ select.field option {
   border-radius: 0.75rem;
   border: 1px solid var(--line);
   box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
+}
+
+/* --- 中獎清單：作廢重抽 --- */
+.result-voided td {
+  opacity: 0.35;
+}
+.result-voided td:last-child {
+  opacity: 1;
+}
+.result-voided td:nth-child(3) {
+  opacity: 0.6;
+}
+.void-tag {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.75rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+}
+.void-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.15s;
+}
+.void-action:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* 確認視窗：遮罩淡入淡出，視窗本體輕微縮放 */
+.dialog-enter-active,
+.dialog-leave-active {
+  transition: opacity 0.2s ease;
+}
+.dialog-enter-active > div,
+.dialog-leave-active > div {
+  transition: transform 0.2s ease;
+}
+.dialog-enter-from,
+.dialog-leave-to {
+  opacity: 0;
+}
+.dialog-enter-from > div,
+.dialog-leave-to > div {
+  transform: scale(0.96);
 }

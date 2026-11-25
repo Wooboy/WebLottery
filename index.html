@@ -482,10 +482,19 @@
                 <span class="lt-ribbon-lbl">已中獎</span>
                 <!-- 以獎項 id 為 key：切換獎項時整排直接換掉，不播放上一個獎項名單的離場動畫 -->
                 <transition-group :key="activePrize.id" name="list" tag="div" class="lt-chips">
-                  <div v-for="win in currentWinners" :key="win.id" class="lt-chip">
+                  <!-- 點名字可作廢重抽（中獎者不在現場）；畫面上不另外提示，避免當事人難堪 -->
+                  <button
+                    v-for="win in currentWinners"
+                    :key="win.id"
+                    type="button"
+                    tabindex="-1"
+                    :disabled="isBusy"
+                    @click="voidWinnerOnStage(win)"
+                    class="lt-chip lt-chip-btn"
+                  >
                     <b>{{ win.winner }}</b>
                     <span v-if="win.winnerId">{{ win.winnerId }}</span>
-                  </div>
+                  </button>
                 </transition-group>
                 <div v-if="!currentWinners.length" class="lt-chip lt-chip-empty">
                   本獎項尚無中獎者
@@ -644,7 +653,7 @@
         </div>
 
         <!-- 確認視窗（取代 confirm，避免跳出全螢幕） -->
-        <transition name="toast">
+        <transition name="dialog">
           <div
             v-if="dialog.open"
             class="fixed inset-0 z-[3000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
@@ -658,7 +667,9 @@
               <h3 class="text-xl font-black flex items-center gap-2">
                 <bx-icon name="bx-error" class="text-amber-300"></bx-icon>{{ dialog.title }}
               </h3>
-              <p class="mt-3 text-sm leading-relaxed text-white/70">{{ dialog.message }}</p>
+              <p v-if="dialog.message" class="mt-3 text-sm leading-relaxed text-white/70">
+                {{ dialog.message }}
+              </p>
               <div class="mt-7 flex justify-end gap-3">
                 <button
                   ref="dialogCancelEl"
@@ -711,21 +722,43 @@
                     <th class="p-6">ID</th>
                     <th class="p-6">得獎英雄</th>
                     <th class="p-6 font-mono text-center">抽出時間戳</th>
+                    <th class="p-6"></th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
                   <tr
                     v-for="res in state.results"
                     :key="res.id"
-                    class="hover:bg-white/5 transition"
+                    :class="['hover:bg-white/5 transition', { 'result-voided': res.voided }]"
                   >
                     <td class="p-6 font-bold text-yellow-400">{{ resultPrizeName(res) }}</td>
                     <td class="p-6 font-mono text-sm opacity-70">{{ res.winnerId }}</td>
-                    <td class="p-6 font-black text-3xl tracking-tight">{{ res.winner }}</td>
+                    <td class="p-6 font-black text-3xl tracking-tight">
+                      {{ res.winner }}
+                      <span v-if="res.voided" class="void-tag">作廢重抽</span>
+                    </td>
                     <td class="p-6 font-mono text-[10px] opacity-20 text-center">{{ res.seed }}</td>
+                    <td class="p-6 text-right whitespace-nowrap">
+                      <button
+                        v-if="res.voided"
+                        @click="restoreResult(res)"
+                        class="void-action"
+                        title="恢復為有效的中獎紀錄"
+                      >
+                        <bx-icon name="bx-reset" class="mr-1"></bx-icon>恢復
+                      </button>
+                      <button
+                        v-else
+                        @click="voidResult(res)"
+                        class="void-action"
+                        title="中獎者不在現場：作廢並讓名額可補抽，此人之後不會再被抽到"
+                      >
+                        <bx-icon name="bx-x" class="mr-1"></bx-icon>作廢重抽
+                      </button>
+                    </td>
                   </tr>
                   <tr v-if="state.results.length === 0">
-                    <td colspan="4" class="p-32 text-center opacity-20 italic text-xl">
+                    <td colspan="5" class="p-32 text-center opacity-20 italic text-xl">
                       目前尚無抽獎紀錄
                     </td>
                   </tr>
@@ -948,6 +981,12 @@
                   <li>
                     右下角「重抽」會清除本獎項的中獎紀錄並重新抽，按下後會先確認，不會離開全螢幕。
                   </li>
+                  <li>
+                    <b>中獎者不在現場（作廢重抽）</b
+                    >：點下方已中獎名單中該人員的名字，確認「作廢並重抽？」後，該人員從名單移除、名額回流，再按
+                    <kbd>空白鍵</kbd>
+                    補抽。被作廢的人之後所有獎項都不會再被抽到（包含允許重複中獎的獎項）；畫面上不會顯示作廢字樣。
+                  </li>
                   <li>切換獎項或離開再進入時，各獎項會保留最後的抽獎畫面。</li>
                   <li>
                     抽獎進行到一半離開（例如已發牌但還沒翻、淘汰到一半），再次進入時會回到原本的畫面繼續；離開時若動畫還在播放，會在背景播完並照常記錄。
@@ -986,8 +1025,13 @@
                   <li>「中獎清單」頁籤列出所有中獎紀錄：獎項名稱、ID、中獎人員與抽出時間。</li>
                   <li>
                     按「匯出 CSV 名單」下載 CSV，可用 Excel
-                    開啟（欄位：獎項名稱、獎品內容、ID、中獎人員、抽出時間戳）。
+                    開啟（欄位：獎項名稱、獎品內容、ID、中獎人員、狀態、抽出時間戳）。
                   </li>
+                  <li>
+                    作廢重抽的紀錄不會刪除，在清單中反灰並標上「作廢重抽」，CSV
+                    的「狀態」欄也會註明。每筆紀錄右側可「作廢重抽」（抽完後才發現不在現場時使用）或「恢復」（誤按時使用；該獎項若已補抽滿額，恢復前會提醒）。
+                  </li>
+                  <li>事前就知道不會到場的人，直接從參與名單刪除即可。</li>
                 </ul>
               </section>
 

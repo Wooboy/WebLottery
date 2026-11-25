@@ -257,10 +257,14 @@ createApp({
     function poolFor(prize) {
       if (!prize) return []
       const repeatPrizeIds = new Set(state.prizes.filter((p) => p.allowRepeat).map((p) => p.id))
+      // 作廢重抽的人員（中獎但不在現場）之後所有獎項都不再抽到
       const excluded = new Set(
         state.results
           .filter(
-            (r) => r.prizeId === prize.id || (!prize.allowRepeat && !repeatPrizeIds.has(r.prizeId)),
+            (r) =>
+              r.voided ||
+              r.prizeId === prize.id ||
+              (!prize.allowRepeat && !repeatPrizeIds.has(r.prizeId)),
           )
           .map((r) => r.winnerId.toUpperCase()),
       )
@@ -269,7 +273,7 @@ createApp({
 
     const currentWinners = computed(() => {
       if (!activePrize.value) return []
-      return state.results.filter((r) => r.prizeId === activePrize.value.id)
+      return state.results.filter((r) => r.prizeId === activePrize.value.id && !r.voided)
     })
     const currentWinnerPeople = computed(() =>
       currentWinners.value.map((r) => ({ id: r.winnerId, name: r.winner })),
@@ -277,7 +281,8 @@ createApp({
 
     function remainingCount(prizeId) {
       const p = state.prizes.find((i) => i.id === prizeId)
-      const won = state.results.filter((r) => r.prizeId === prizeId).length
+      // 作廢的紀錄不佔名額
+      const won = state.results.filter((r) => r.prizeId === prizeId && !r.voided).length
       return p ? Math.max(0, p.count - won) : 0
     }
 
@@ -685,6 +690,7 @@ createApp({
           winnerId: String(r.winnerId),
           winner: String(r.winner ?? ''),
           seed: r.seed ?? '',
+          ...(r.voided ? { voided: true, voidedAt: r.voidedAt ?? '' } : {}),
         }))
     }
 
@@ -756,8 +762,53 @@ createApp({
         okText: '清除並重抽',
       })
       if (!ok) return
-      state.results = state.results.filter((r) => r.prizeId !== p.id)
+      // 作廢的紀錄保留：不在現場的人重抽後仍不回到待抽名單
+      state.results = state.results.filter((r) => r.prizeId !== p.id || r.voided)
       prizeEpoch[p.id] = (prizeEpoch[p.id] || 0) + 1
+    }
+
+    // --- 作廢重抽：中獎者不在現場時作廢，名額回流可補抽，該人員之後不再進入待抽名單 ---
+    // 紀錄不刪除，只標記 voided，留下誰被作廢的紀錄。
+    // 作廢後重建該獎項的舞台，被作廢的人不會留在大螢幕上
+    function refreshPrizeStage(prizeId) {
+      prizeEpoch[prizeId] = (prizeEpoch[prizeId] || 0) + 1
+    }
+    // 抽獎畫面：點下方已中獎名單的名字
+    async function voidWinnerOnStage(r) {
+      if (isBusy.value || r.voided) return
+      const ok = await askConfirm({ title: '作廢並重抽？', okText: '確定' })
+      if (!ok) return
+      r.voided = true
+      r.voidedAt = Date.now()
+      refreshPrizeStage(r.prizeId)
+    }
+    // 中獎清單頁
+    async function voidResult(r) {
+      if (r.voided) return
+      const ok = await askConfirm({
+        title: '作廢並重抽？',
+        message: `「${resultPrizeName(r)}」的 ${r.winner}（${r.winnerId}）將標記為作廢重抽，名額回流可補抽，此人之後不會再被抽到。`,
+        okText: '確定',
+      })
+      if (!ok) return
+      r.voided = true
+      r.voidedAt = Date.now()
+      refreshPrizeStage(r.prizeId)
+    }
+    async function restoreResult(r) {
+      if (!r.voided) return
+      const full = remainingCount(r.prizeId) <= 0
+      const ok = await askConfirm({
+        title: '恢復這筆中獎紀錄？',
+        message: full
+          ? `⚠️「${resultPrizeName(r)}」名額已滿（已補抽），恢復後中獎人數會超過名額。`
+          : `${r.winner}（${r.winnerId}）將恢復為「${resultPrizeName(r)}」的中獎者。`,
+        okText: '恢復',
+      })
+      if (!ok) return
+      delete r.voided
+      delete r.voidedAt
+      refreshPrizeStage(r.prizeId)
     }
 
     function clearResults() {
@@ -818,11 +869,18 @@ createApp({
         if (/^[=+\-@]/.test(t)) t = "'" + t
         return /[",\r\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
       }
-      let content = '\ufeff獎項名稱,獎品內容,ID,中獎人員,抽出時間戳(Timestamp)\n'
+      let content = '\ufeff獎項名稱,獎品內容,ID,中獎人員,狀態,抽出時間戳(Timestamp)\n'
       state.results.forEach((r) => {
         const prize = state.prizes.find((p) => p.id === r.prizeId)
         content +=
-          [prize?.name ?? r.prizeName, prize?.reward || '', r.winnerId, r.winner, r.seed]
+          [
+            prize?.name ?? r.prizeName,
+            prize?.reward || '',
+            r.winnerId,
+            r.winner,
+            r.voided ? '作廢重抽' : '有效',
+            r.seed,
+          ]
             .map(cell)
             .join(',') + '\n'
       })
@@ -888,6 +946,9 @@ createApp({
       bgStatus,
       onBgLoad,
       confirmRedraw,
+      voidWinnerOnStage,
+      voidResult,
+      restoreResult,
       changeTab,
       prevPrize,
       nextPrize,
