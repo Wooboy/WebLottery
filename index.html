@@ -57,6 +57,27 @@
                 >({{ state.results.length }})</span
               >
             </button>
+            <a
+              href="https://github.com/Wooboy/WebLottery"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="在新分頁開啟 GitHub 原始碼"
+              class="inline-flex items-center gap-1.5 px-5 py-2 rounded-full font-bold text-sm transition text-white/60 hover:text-white hover:bg-white/10"
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="16"
+                height="16"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                />
+              </svg>
+              原始碼
+              <span class="text-xs opacity-60" aria-hidden="true">↗</span>
+            </a>
           </nav>
           <button
             @click="enterPresentation"
@@ -252,12 +273,13 @@
                   + 新增獎項
                 </button>
               </div>
-              <table class="w-full text-left min-w-[1100px]">
+              <table class="prize-table w-full text-left min-w-[1100px]">
                 <thead
-                  class="text-xs opacity-40 border-b border-white/10 uppercase tracking-widest"
+                  class="text-xs opacity-50 border-b border-white/10 uppercase tracking-widest"
                 >
                   <tr>
-                    <th class="pb-3">名稱 / 獎品</th>
+                    <th class="pb-3 w-10 text-center">#</th>
+                    <th class="pb-3 w-64">名稱 / 獎品</th>
                     <th class="pb-3 w-24 text-center">數量</th>
                     <th class="pb-3 w-64">抽獎模式 (多人時)</th>
                     <th class="pb-3 w-32 text-center">允許重複中獎</th>
@@ -267,22 +289,33 @@
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-white/5">
-                  <tr v-for="(p, i) in state.prizes" :key="i">
+                  <tr v-for="(p, i) in state.prizes" :key="p.id">
+                    <td class="text-center text-sm font-bold opacity-40 align-top pt-6">
+                      {{ i + 1 }}
+                    </td>
                     <td class="py-4 pr-4">
                       <input
                         v-model="p.name"
-                        class="bg-transparent border-b border-white/10 w-full mb-1 font-bold outline-none focus:border-white/50"
+                        placeholder="獎項名稱，例如：頭獎"
+                        aria-label="獎項名稱"
+                        class="prize-name field field-strong w-full mb-2"
                       />
                       <input
                         v-model="p.reward"
-                        class="bg-transparent text-xs opacity-50 w-full outline-none"
+                        placeholder="獎品內容，例如：iPhone 17"
+                        aria-label="獎品內容"
+                        class="field field-sm w-full"
                       />
                     </td>
                     <td class="text-center">
                       <input
                         v-model.number="p.count"
                         type="number"
-                        class="bg-transparent border-b border-white/10 w-16 text-center outline-none"
+                        min="1"
+                        step="1"
+                        aria-label="名額"
+                        class="field field-strong w-20 text-center"
+                        @change="p.count = Math.max(1, parseInt(p.count) || 1)"
                       />
                     </td>
                     <td>
@@ -306,10 +339,7 @@
                       </label>
                     </td>
                     <td class="pr-4 whitespace-nowrap">
-                      <select
-                        v-model="p.style"
-                        class="bg-black/30 border border-white/15 rounded-lg px-2 py-1 text-xs outline-none focus:border-white/50"
-                      >
+                      <select v-model="p.style" aria-label="動畫樣式" class="field field-sm">
                         <option v-for="st in stages" :key="st.key" :value="st.key">
                           {{ st.label }}
                         </option>
@@ -318,7 +348,8 @@
                         v-if="p.style === 'elimination'"
                         v-model.number="p.elimRounds"
                         title="淘汰制每局按幾下（含最後揭曉）"
-                        class="ml-2 bg-black/30 border border-white/15 rounded-lg px-2 py-1 text-xs outline-none focus:border-white/50"
+                        aria-label="淘汰輪數"
+                        class="field field-sm ml-2"
                       >
                         <option v-for="n in elimRoundOptions" :key="n" :value="n">
                           {{ n === 1 ? '1 輪（直接揭曉）' : n + ' 輪' }}
@@ -346,7 +377,8 @@
                         <input
                           v-model="p.bgUrl"
                           placeholder="圖片網址或路徑（可留空）"
-                          class="bg-transparent text-[10px] w-full opacity-40 focus:opacity-100 outline-none placeholder:opacity-60"
+                          aria-label="背景圖網址或路徑"
+                          class="field field-sm w-full"
                         />
                       </div>
                       <div
@@ -360,7 +392,8 @@
                       <button
                         @click="removePrize(i)"
                         title="刪除此獎項"
-                        class="text-red-400 hover:text-red-200"
+                        aria-label="刪除此獎項"
+                        class="w-8 h-8 rounded-full text-red-400 hover:text-red-100 hover:bg-red-500/30 transition"
                       >
                         ✕
                       </button>
@@ -388,7 +421,7 @@
               <div class="lt-count">
                 <div class="lt-count-lbl">剩餘名額</div>
                 <div class="lt-count-num">
-                  {{ remainingCount(activePrize.name) }}<small> / {{ activePrize.count }}</small>
+                  {{ remainingCount(activePrize.id) }}<small> / {{ activePrize.count }}</small>
                 </div>
               </div>
               <div class="lt-navs">
@@ -429,7 +462,7 @@
               <div class="lt-ribbon">
                 <span class="lt-ribbon-lbl">已中獎</span>
                 <transition-group name="list" tag="div" class="lt-chips">
-                  <div v-for="win in currentWinners" :key="win.id || win.seed" class="lt-chip">
+                  <div v-for="win in currentWinners" :key="win.id" class="lt-chip">
                     <b>{{ win.winner }}</b>
                     <span v-if="win.winnerId">{{ win.winnerId }}</span>
                   </div>
@@ -620,11 +653,11 @@
                 <tbody class="divide-y divide-white/5">
                   <tr
                     v-for="res in state.results"
-                    :key="res.id || res.seed"
+                    :key="res.id"
                     class="hover:bg-white/5 transition"
                   >
-                    <td class="p-6 font-bold text-yellow-400">{{ res.prizeName }}</td>
-                    <td class="p-6 font-mono text-sm opacity-70">{{ res.winnerId || '—' }}</td>
+                    <td class="p-6 font-bold text-yellow-400">{{ resultPrizeName(res) }}</td>
+                    <td class="p-6 font-mono text-sm opacity-70">{{ res.winnerId }}</td>
                     <td class="p-6 font-black text-3xl tracking-tight">{{ res.winner }}</td>
                     <td class="p-6 font-mono text-[10px] opacity-20 text-center">{{ res.seed }}</td>
                   </tr>

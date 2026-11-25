@@ -300,6 +300,61 @@ html {
   transform: translate(-50%, -16px);
 }
 
+/* 設定頁表單欄位：明顯的框線與底色，滑過 / 聚焦時強調 */
+.field {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.6rem;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.875rem;
+  color: #fff;
+  outline: none;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s,
+    background-color 0.15s;
+}
+.field::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.field:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+}
+.field:focus {
+  border-color: var(--gold);
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.field-strong {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.field-sm {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.55rem;
+}
+select.field {
+  cursor: pointer;
+  padding-right: 0.4rem;
+}
+select.field option {
+  background: #1b1e27;
+}
+.prize-table input[type='radio'],
+.prize-table input[type='checkbox'] {
+  accent-color: var(--gold);
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+.prize-table tbody tr {
+  transition: background-color 0.15s;
+}
+.prize-table tbody tr:hover,
+.prize-table tbody tr:focus-within {
+  background: rgba(255, 255, 255, 0.03);
+}
+
 /* 參與人員名單：附行號的編輯框 */
 .list-editor {
   display: flex;

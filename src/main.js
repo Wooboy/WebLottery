@@ -1,4 +1,14 @@
-import { createApp, reactive, ref, computed, onMounted, onBeforeUnmount, watch, markRaw } from 'vue'
+import {
+  createApp,
+  reactive,
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  markRaw,
+  nextTick,
+} from 'vue'
 import './style.css'
 import { sample, shuffle } from './lib/random.js'
 import { parseParticipants } from './lib/participants.js'
@@ -50,8 +60,30 @@ createApp({
     const ELIM_ROUND_OPTIONS = [1, 2, 3, 4, 5, 6]
     const DEFAULT_ELIM_ROUNDS = 3
 
+    // 獎項唯一識別碼：中獎紀錄以 prizeId 對應獎項，獎項同名或改名都不會互相影響
+    function genId() {
+      if (crypto.randomUUID) return crypto.randomUUID()
+      const b = crypto.getRandomValues(new Uint8Array(16))
+      b[6] = (b[6] & 0x0f) | 0x40
+      b[8] = (b[8] & 0x3f) | 0x80
+      const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
+      return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`
+    }
+
+    // 整理獎項清單：補齊欄位、確保每個獎項都有不重複的 id
+    function normalizePrizes(list) {
+      const seen = new Set()
+      return (Array.isArray(list) ? list : []).map((raw) => {
+        const p = newPrize({ ...raw, style: normalizeStageKey(raw?.style) })
+        if (seen.has(p.id)) p.id = genId()
+        seen.add(p.id)
+        return p
+      })
+    }
+
     function newPrize(fields = {}) {
       const p = {
+        id: '',
         name: '新獎項',
         reward: '',
         count: 1,
@@ -64,6 +96,7 @@ createApp({
       }
       const r = parseInt(p.elimRounds)
       p.elimRounds = ELIM_ROUND_OPTIONS.includes(r) ? r : DEFAULT_ELIM_ROUNDS
+      if (!p.id || typeof p.id !== 'string') p.id = genId()
       return p
     }
 
@@ -91,11 +124,10 @@ createApp({
           console.error('解析存檔失敗:', e)
         }
       }
-      // 舊版存檔補上新欄位的預設值
+      // 檢查存檔內容，缺少的欄位補上預設值
       state.config = { ...defaultState.config, ...state.config }
-      state.prizes = (Array.isArray(state.prizes) ? state.prizes : []).map((p) =>
-        newPrize({ ...p, style: normalizeStageKey(p.style) }),
-      )
+      state.prizes = normalizePrizes(state.prizes)
+      if (!Array.isArray(state.results)) state.results = []
       // 存檔中的獎項位置若超出範圍（例如曾刪除獎項），回到第一個獎項
       if (!(state.currentIndex >= 0 && state.currentIndex < state.prizes.length)) {
         state.currentIndex = 0
@@ -185,36 +217,38 @@ createApp({
     // - 「不允許重複中獎」的獎項：另外排除中過其他「不允許重複」獎項的人
     // - 「允許重複中獎」的獎項：從全部名單抽（僅排除本獎項已中獎者）
     // - 中過「允許重複」獎項的人，不影響其他獎項的抽獎資格
-    // （找不到對應獎項的舊紀錄，視為不允許重複，保守排除）
+    // （已刪除獎項的紀錄視為不允許重複，保守排除）
     const availablePool = computed(() => {
       const prize = activePrize.value
       if (!prize) return []
-      const repeatPrizeNames = new Set(state.prizes.filter((p) => p.allowRepeat).map((p) => p.name))
+      const repeatPrizeIds = new Set(state.prizes.filter((p) => p.allowRepeat).map((p) => p.id))
       const excluded = new Set(
         state.results
           .filter(
-            (r) =>
-              r.prizeName === prize.name ||
-              (!prize.allowRepeat && !repeatPrizeNames.has(r.prizeName)),
+            (r) => r.prizeId === prize.id || (!prize.allowRepeat && !repeatPrizeIds.has(r.prizeId)),
           )
-          // 舊版紀錄沒有 winnerId，以名稱比對
-          .map((r) => (r.winnerId ?? r.winner).toUpperCase()),
+          .map((r) => r.winnerId.toUpperCase()),
       )
       return participantsAll.value.filter((p) => !excluded.has(p.id.toUpperCase()))
     })
 
     const currentWinners = computed(() => {
       if (!activePrize.value) return []
-      return state.results.filter((r) => r.prizeName === activePrize.value.name)
+      return state.results.filter((r) => r.prizeId === activePrize.value.id)
     })
     const currentWinnerPeople = computed(() =>
-      currentWinners.value.map((r) => ({ id: r.winnerId ?? '', name: r.winner })),
+      currentWinners.value.map((r) => ({ id: r.winnerId, name: r.winner })),
     )
 
-    function remainingCount(prizeName) {
-      const p = state.prizes.find((i) => i.name === prizeName)
-      const won = state.results.filter((r) => r.prizeName === prizeName).length
+    function remainingCount(prizeId) {
+      const p = state.prizes.find((i) => i.id === prizeId)
+      const won = state.results.filter((r) => r.prizeId === prizeId).length
       return p ? Math.max(0, p.count - won) : 0
+    }
+
+    // 中獎紀錄顯示的獎項名稱：以目前獎項名稱為準（獎項已刪除則用抽獎當時的名稱）
+    function resultPrizeName(r) {
+      return state.prizes.find((p) => p.id === r.prizeId)?.name ?? r.prizeName
     }
 
     // --- 抽獎舞台 ---
@@ -280,12 +314,13 @@ createApp({
     const ctx = makeDrawEngine({
       prize: () => activePrize.value,
       pool: () => availablePool.value,
-      remaining: () => (activePrize.value ? remainingCount(activePrize.value.name) : 0),
+      remaining: () => (activePrize.value ? remainingCount(activePrize.value.id) : 0),
       record(people) {
         const timestamp = Date.now()
         for (const person of people) {
           state.results.push({
             id: `${timestamp}-${drawCounter++}`,
+            prizeId: activePrize.value.id,
             prizeName: activePrize.value.name,
             winnerId: person.id,
             winner: person.name,
@@ -532,8 +567,8 @@ createApp({
         }
         if (!confirm(msg.join('\n'))) return
         state.rawParticipants = String(data.rawParticipants || '')
-        state.prizes = data.prizes.map((p) =>
-          newPrize({ ...p, count: parseInt(p?.count) || 1, style: normalizeStageKey(p?.style) }),
+        state.prizes = normalizePrizes(
+          data.prizes.map((p) => ({ ...p, count: parseInt(p?.count) || 1 })),
         )
         state.config = { ...defaultState.config, ...(data.config || {}) }
         state.results = []
@@ -546,7 +581,7 @@ createApp({
 
     function confirmRedraw() {
       if (confirm('警告：這將清除此獎項目前的「所有」中獎紀錄並讓名額回流，確定嗎？')) {
-        state.results = state.results.filter((r) => r.prizeName !== activePrize.value.name)
+        state.results = state.results.filter((r) => r.prizeId !== activePrize.value.id)
         stageEpoch.value++
       }
     }
@@ -582,7 +617,7 @@ createApp({
     function removePrize(i) {
       const p = state.prizes[i]
       if (!p) return
-      const won = state.results.filter((r) => r.prizeName === p.name).length
+      const won = state.results.filter((r) => r.prizeId === p.id).length
       const msg = [`確定要刪除獎項「${p.name || '(未命名)'}」嗎？`]
       if (won) msg.push(`⚠️ 此獎項已有 ${won} 筆中獎紀錄，紀錄會保留在中獎清單中。`)
       if (!confirm(msg.join('\n'))) return
@@ -592,6 +627,13 @@ createApp({
 
     function addPrize() {
       state.prizes.push(newPrize())
+      // 新增後直接選取新獎項的名稱，方便馬上輸入
+      nextTick(() => {
+        const inputs = document.querySelectorAll('.prize-name')
+        const el = inputs[inputs.length - 1]
+        el?.focus()
+        el?.select()
+      })
     }
 
     function exportCSV() {
@@ -604,9 +646,9 @@ createApp({
       }
       let content = '\ufeff獎項名稱,獎品內容,ID,中獎人員,抽出時間戳(Timestamp)\n'
       state.results.forEach((r) => {
-        const prize = state.prizes.find((p) => p.name === r.prizeName)
+        const prize = state.prizes.find((p) => p.id === r.prizeId)
         content +=
-          [r.prizeName, prize?.reward || '', r.winnerId ?? '', r.winner, r.seed]
+          [prize?.name ?? r.prizeName, prize?.reward || '', r.winnerId, r.winner, r.seed]
             .map(cell)
             .join(',') + '\n'
       })
@@ -648,6 +690,7 @@ createApp({
       currentWinners,
       currentWinnerPeople,
       remainingCount,
+      resultPrizeName,
       stageComponent,
       stageKey,
       stageRef,
