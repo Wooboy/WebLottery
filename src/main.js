@@ -2,6 +2,7 @@ import { createApp, reactive, ref, computed, onMounted, onBeforeUnmount, watch, 
 import './style.css'
 import { sample, shuffle } from './lib/random.js'
 import { parseParticipants } from './lib/participants.js'
+import { toImageUrl, cssImageUrl } from './lib/image-url.js'
 import { sfx, setSoundEnabled } from './lib/sound.js'
 import { confetti, clearConfetti } from './lib/confetti.js'
 import { STAGES, DEFAULT_STAGE, stageOf, parseStageKey, normalizeStageKey } from './stages/index.js'
@@ -592,6 +593,23 @@ createApp({
       }
     }
 
+    // 背景圖載入狀態（以轉換後的網址為 key）：'ok' | 'error'
+    const bgStatus = reactive({})
+    function onBgLoad(url, ok) {
+      bgStatus[url] = ok ? 'ok' : 'error'
+    }
+
+    function removePrize(i) {
+      const p = state.prizes[i]
+      if (!p) return
+      const won = state.results.filter((r) => r.prizeName === p.name).length
+      const msg = [`確定要刪除獎項「${p.name || '(未命名)'}」嗎？`]
+      if (won) msg.push(`⚠️ 此獎項已有 ${won} 筆中獎紀錄，紀錄會保留在中獎清單中。`)
+      if (!confirm(msg.join('\n'))) return
+      state.prizes.splice(i, 1)
+      if (state.currentIndex >= state.prizes.length) state.currentIndex = 0
+    }
+
     function addPrize() {
       state.prizes.push(newPrize())
     }
@@ -656,6 +674,10 @@ createApp({
       importPrizeCSV,
       exportSettings,
       importSettings,
+      toImageUrl,
+      cssImageUrl,
+      bgStatus,
+      onBgLoad,
       confirmRedraw,
       changeTab,
       prevPrize,
@@ -681,6 +703,7 @@ createApp({
       resetSystem,
       clearResults,
       addPrize,
+      removePrize,
       exportCSV,
     }
   },

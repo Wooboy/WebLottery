@@ -13,7 +13,7 @@
         <div
           v-if="isPresenting && activePrize"
           class="absolute inset-0 bg-cover bg-center opacity-20 pointer-events-none transition-all duration-1000"
-          :style="{ backgroundImage: activePrize.bgUrl ? `url(${activePrize.bgUrl})` : '' }"
+          :style="{ backgroundImage: cssImageUrl(activePrize.bgUrl) }"
         ></div>
 
         <!-- 上方選單（一般模式）：設定 / 中獎清單，進入全螢幕開始抽獎 -->
@@ -317,15 +317,34 @@
                         👁 預覽
                       </button>
                     </td>
-                    <td>
-                      <input
-                        v-model="p.bgUrl"
-                        class="bg-transparent text-[10px] w-full opacity-40 focus:opacity-100 outline-none"
-                      />
+                    <td class="min-w-[10rem]">
+                      <div class="flex items-center gap-2">
+                        <img
+                          v-if="toImageUrl(p.bgUrl)"
+                          v-show="bgStatus[toImageUrl(p.bgUrl)] !== 'error'"
+                          :src="toImageUrl(p.bgUrl)"
+                          alt=""
+                          class="w-10 h-6 shrink-0 object-cover rounded border border-white/20"
+                          @load="onBgLoad(toImageUrl(p.bgUrl), true)"
+                          @error="onBgLoad(toImageUrl(p.bgUrl), false)"
+                        />
+                        <input
+                          v-model="p.bgUrl"
+                          placeholder="圖片網址或路徑（可留空）"
+                          class="bg-transparent text-[10px] w-full opacity-40 focus:opacity-100 outline-none placeholder:opacity-60"
+                        />
+                      </div>
+                      <div
+                        v-if="toImageUrl(p.bgUrl) && bgStatus[toImageUrl(p.bgUrl)] === 'error'"
+                        class="text-[10px] text-red-300 mt-1"
+                      >
+                        ⚠ 圖片讀取失敗，請確認路徑或網址
+                      </div>
                     </td>
                     <td class="text-right">
                       <button
-                        @click="state.prizes.splice(i, 1)"
+                        @click="removePrize(i)"
+                        title="刪除此獎項"
                         class="text-red-400 hover:text-red-200"
                       >
                         ✕
