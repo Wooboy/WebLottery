@@ -42,7 +42,7 @@
           class="relative z-20 shrink-0 flex flex-wrap items-center gap-3 px-6 py-4 border-b border-white/10 bg-black/20 backdrop-blur"
         >
           <div class="font-black text-lg tracking-wide mr-2">
-            <bx-icon name="bx-gift" class="mr-2 text-yellow-300"></bx-icon>抽獎系統
+            <bx-icon name="bx-gift" class="mr-2 text-yellow-300"></bx-icon>線上抽獎系統
           </div>
           <nav class="flex gap-2">
             <button
@@ -248,7 +248,7 @@
                       </label>
                     </div>
                     <p class="text-[10px] mt-2 opacity-50 leading-relaxed">
-                      包含參與名單、獎項與系統設定（不含中獎紀錄）。可在個人電腦設定好後匯出，再到會場電腦匯入；匯入會覆蓋目前的名單與獎項，並清空中獎紀錄。
+                      包含參與名單、獎項、系統設定與中獎紀錄。可在個人電腦設定好後匯出，再到會場電腦匯入；抽獎中途需要換電腦時，匯出後到新電腦匯入即可接續抽。匯入會覆蓋目前的名單、獎項與中獎紀錄。
                     </p>
                   </div>
                 </div>
@@ -732,6 +732,306 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </main>
+        <!-- 頁面：使用手冊 (Manual) -->
+        <main
+          v-if="!isPresenting && currentView === 'manual'"
+          ref="manualScrollEl"
+          @scroll.passive="onManualScroll"
+          class="flex-1 overflow-y-auto p-8 pb-16 relative z-10 scroll-container"
+        >
+          <div class="manual-layout">
+            <article class="manual">
+              <h2 class="text-3xl font-black border-b border-white/20 pb-4 mb-6">
+                <bx-icon name="bx-book-open" class="mr-3 text-yellow-300"></bx-icon>使用手冊
+              </h2>
+
+              <!-- 窄螢幕：大綱放在標題下方 -->
+              <nav class="manual-toc glass-panel">
+                <a
+                  v-for="t in manualToc"
+                  :key="t.id"
+                  :href="'#' + t.id"
+                  :class="{ active: manualSection === t.id }"
+                  @click.prevent="goManual(t.id)"
+                  >{{ t.label }}</a
+                >
+              </nav>
+
+              <section id="m-start">
+                <h3>一、快速開始</h3>
+                <ol>
+                  <li>在「設定」頁的<b>參與人員名單</b>貼上名單（每行「ID,顯示名稱」）。</li>
+                  <li>
+                    在<b>獎項清單配置</b>新增獎項，設定名額、抽獎模式與動畫樣式，可按「預覽」先試抽。
+                  </li>
+                  <li>按右上角<b>開始抽獎（全螢幕）</b>進入抽獎畫面。</li>
+                  <li>
+                    按 <kbd>空白鍵</kbd> 或 <kbd>Enter</kbd> 抽獎，依畫面下方提示進行；<kbd
+                      >PageUp</kbd
+                    >
+                    / <kbd>PageDown</kbd> 切換獎項。
+                  </li>
+                  <li>抽完後按 <kbd>Esc</kbd> 離開，到「中獎清單」頁匯出 CSV。</li>
+                </ol>
+                <p class="manual-tip">
+                  所有資料都存在這台電腦的瀏覽器中，重新整理或關閉頁面不會遺失進度；不需要網路，也不需要伺服器。
+                </p>
+              </section>
+
+              <section id="m-people">
+                <h3>二、參與人員名單</h3>
+                <ul>
+                  <li>
+                    每行一位，格式為「<code>ID,顯示名稱</code>」，例如 <code>E001,王小明</code>。ID
+                    建議使用員工編號，<b>不可重複</b>；顯示名稱可以重複（同名不同人不會互相影響）。
+                  </li>
+                  <li>
+                    可用半形逗號、全形逗號或 Tab 分隔，可直接從 Excel
+                    複製「員編、姓名」兩欄貼上；第一行若是「員編,姓名」等標題列會自動略過。
+                  </li>
+                  <li>
+                    格式有誤（缺少逗號、缺少名稱、ID
+                    重複）時，該行行號標紅，名單下方列出錯誤行，點選即跳到該行；<b>修正前無法開始抽獎</b>。
+                  </li>
+                  <li>
+                    <b>打亂順序</b>：以安全亂數重排名單，只影響畫面上的排列順序，不影響中獎機率。
+                  </li>
+                  <li>
+                    <b>名單鎖定</b
+                    >：一旦有任何中獎紀錄，名單即鎖定不可修改；需要修改時請先按「清空中獎名單」。
+                  </li>
+                  <li>
+                    <b>員編長度</b>：有獎項使用「老虎機」動畫時，名單中每個 ID 都必須是此長度（3～5
+                    碼）的英數字。
+                  </li>
+                </ul>
+              </section>
+
+              <section id="m-prizes">
+                <h3>三、獎項設定</h3>
+                <p>在「獎項清單配置」表格按「新增獎項」，每個獎項可設定：</p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>欄位</th>
+                      <th>說明</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>獎項名稱 / 獎品內容</td>
+                      <td>顯示在抽獎畫面上方，例如「頭獎」「機車一台」。</td>
+                    </tr>
+                    <tr>
+                      <td>名額</td>
+                      <td>這個獎項要抽出幾位。</td>
+                    </tr>
+                    <tr>
+                      <td>抽獎模式</td>
+                      <td>
+                        名額大於 1
+                        時可選：<b>連續單抽</b>（每按一次抽一位）或<b>一次抽完</b>（一次揭曉全部名額）。
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>允許重複中獎</td>
+                      <td>
+                        不勾選（預設）：已中過其他「不允許重複」獎項的人不會再被抽到。<br />
+                        勾選：從全部名單抽選，適合加碼獎、紅包；中過此類獎項也不影響其他獎項的資格。<br />
+                        不論哪一種，同一獎項內都不會抽到同一人兩次。
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>動畫樣式</td>
+                      <td>
+                        九種抽獎動畫擇一（見「抽獎動畫一覽」）。選「淘汰制」時可另外設定輪數。
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>預覽</td>
+                      <td>
+                        以該獎項的設定模擬抽獎，可在預覽中切換樣式比較；結果不會寫入中獎紀錄。
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>背景圖</td>
+                      <td>
+                        選填，抽獎時淡化鋪在背景。可填網址、相對於
+                        <code>index.html</code> 的路徑（例如 <code>img/頭獎.jpg</code>），或直接貼上
+                        Windows 路徑（例如
+                        <code>C:\圖片\頭獎.jpg</code>）。左側顯示縮圖，讀取失敗會顯示紅字。
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>刪除</td>
+                      <td>按垃圾桶圖示刪除，刪除前會再確認一次。</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+
+              <section id="m-system">
+                <h3>四、系統設定</h3>
+                <ul>
+                  <li>
+                    <b>介面色系主題</b
+                    >：紅、黑、藍、綠、金五種；底色固定深色，主題色用於點綴，金色保留給中獎者。
+                  </li>
+                  <li>
+                    <b>現場效果</b
+                    >：可分別開關「音效」與「中獎彩帶特效」。音效為程式合成，不需要音檔。
+                  </li>
+                  <li><b>清空中獎名單</b>：刪除所有中獎紀錄，保留名單與獎項，可重新開始抽獎。</li>
+                  <li><b>全部重設</b>：名單、獎項、中獎紀錄全部刪除，回到初始狀態。</li>
+                </ul>
+              </section>
+
+              <section id="m-file">
+                <h3>五、設定檔匯出 / 匯入</h3>
+                <ul>
+                  <li>
+                    <b>匯出設定檔</b>：下載
+                    <code>抽獎設定_日期-時間.json</code
+                    >，內容包含參與名單、獎項、系統設定與目前的中獎紀錄。
+                  </li>
+                  <li>
+                    <b>匯入設定檔</b>：選取匯出的 JSON
+                    檔，確認後會覆蓋目前的名單、獎項、設定與中獎紀錄。
+                  </li>
+                  <li>
+                    <b>事前準備</b>：在個人電腦設定好後匯出，到會場電腦開啟
+                    <code>index.html</code> 再匯入即可。
+                  </li>
+                  <li>
+                    <b>抽到一半換電腦</b
+                    >：在原電腦匯出、新電腦匯入，已中獎者不會被重複抽到，可直接接續下一個獎項。
+                  </li>
+                </ul>
+                <p class="manual-tip">
+                  背景圖若使用本機路徑，換電腦時需一併複製圖片並保持相同路徑。
+                </p>
+              </section>
+
+              <section id="m-draw">
+                <h3>六、抽獎畫面操作</h3>
+                <p>
+                  按右上角「開始抽獎（全螢幕）」進入。畫面分為三段：上方為獎項名稱、獎品與剩餘名額；中間為抽獎動畫；下方為本獎項已中獎名單與操作提示。
+                </p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>按鍵</th>
+                      <th>功能</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><kbd>空白鍵</kbd> / <kbd>Enter</kbd></td>
+                      <td>抽獎（開始 / 停止 / 下一步），依畫面下方提示操作</td>
+                    </tr>
+                    <tr>
+                      <td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td>
+                      <td>上一個 / 下一個獎項（抽獎進行中會鎖定）</td>
+                    </tr>
+                    <tr>
+                      <td><kbd>Esc</kbd></td>
+                      <td>離開抽獎畫面</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <ul>
+                  <li>簡報筆的翻頁鍵即為 PageUp / PageDown，可直接用簡報筆操作。</li>
+                  <li>也可以點畫面右上角的左右箭頭切換獎項、點 ✕ 離開。</li>
+                  <li>獎項抽完時，右下角會出現「下一個獎項」按鈕。</li>
+                  <li>
+                    右下角「重抽」會清除本獎項的中獎紀錄並重新抽，按下後會先確認，不會離開全螢幕。
+                  </li>
+                  <li>切換獎項或離開再進入時，各獎項會保留最後的抽獎畫面。</li>
+                  <li>
+                    抽獎進行到一半離開（例如已發牌但還沒翻、淘汰到一半），再次進入時會回到原本的畫面繼續；離開時若動畫還在播放，會在背景播完並照常記錄。
+                  </li>
+                </ul>
+              </section>
+
+              <section id="m-stages">
+                <h3>七、抽獎動畫一覽</h3>
+                <p>每個獎項可各自選擇動畫樣式。以下截圖為 1024 × 768 畫面（60 位參與人員）。</p>
+                <figure
+                  v-for="(s, i) in manualStages"
+                  :key="s.key"
+                  :id="'m-stage-' + s.key"
+                  class="manual-shot"
+                >
+                  <figcaption>
+                    <span class="manual-shot-no">{{ i + 1 }}</span>
+                    <b>{{ s.label }}</b>
+                    <span>{{ s.note }}</span>
+                  </figcaption>
+                  <img
+                    v-if="s.img"
+                    :src="s.img"
+                    :alt="s.label + ' 抽獎畫面'"
+                    width="1024"
+                    height="768"
+                    loading="lazy"
+                  />
+                </figure>
+              </section>
+
+              <section id="m-results">
+                <h3>八、中獎清單與匯出</h3>
+                <ul>
+                  <li>「中獎清單」頁籤列出所有中獎紀錄：獎項名稱、ID、中獎人員與抽出時間。</li>
+                  <li>
+                    按「匯出 CSV 名單」下載 CSV，可用 Excel
+                    開啟（欄位：獎項名稱、獎品內容、ID、中獎人員、抽出時間戳）。
+                  </li>
+                </ul>
+              </section>
+
+              <section id="m-notes">
+                <h3>九、注意事項</h3>
+                <ul>
+                  <li>
+                    <b>公平性</b
+                    >：中獎者在按下按鍵當下以密碼學安全亂數，從當時可抽的名單中均勻抽出；動畫只負責呈現結果，不影響誰中獎。
+                  </li>
+                  <li>
+                    <b>資料保存</b
+                    >：資料存在瀏覽器中，清除瀏覽器資料會一併清除；建議活動前與抽獎中途適時匯出設定檔備份。
+                  </li>
+                  <li><b>全螢幕</b>：瀏覽器不允許全螢幕時，會以視窗模式抽獎（按 Esc 離開）。</li>
+                  <li><b>瀏覽器</b>：建議使用最新版 Chrome 或 Edge。</li>
+                </ul>
+              </section>
+            </article>
+
+            <!-- 寬螢幕：右側固定大綱，捲動時高亮目前章節 -->
+            <aside class="manual-side">
+              <nav class="manual-outline" aria-label="使用手冊大綱">
+                <div class="manual-outline-title">本頁大綱</div>
+                <template v-for="t in manualToc" :key="t.id">
+                  <a
+                    :href="'#' + t.id"
+                    :class="{ active: manualActive === t.id, within: manualSection === t.id && manualActive !== t.id }"
+                    @click.prevent="goManual(t.id)"
+                    >{{ t.label }}</a
+                  >
+                  <template v-if="t.id === 'm-stages'">
+                    <a
+                      v-for="s in manualStages"
+                      :key="s.key"
+                      :href="'#m-stage-' + s.key"
+                      :class="['sub', { active: manualActive === 'm-stage-' + s.key }]"
+                      @click.prevent="goManual('m-stage-' + s.key)"
+                      >{{ s.label }}</a
+                    >
+                  </template>
+                </template>
+              </nav>
+            </aside>
           </div>
         </main>
       </div>

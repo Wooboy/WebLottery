@@ -452,3 +452,222 @@ select.field option {
 .list-editor.locked .list-text {
   cursor: not-allowed;
 }
+
+/* --- 使用手冊 --- */
+.manual {
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.85);
+}
+.manual section {
+  scroll-margin-top: 1rem;
+  margin-top: 2.5rem;
+}
+.manual h3 {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 0.75rem;
+  padding-left: 0.75rem;
+  border-left: 4px solid var(--gold);
+}
+.manual p {
+  margin: 0.5rem 0;
+}
+.manual ol,
+.manual ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+.manual ol {
+  list-style: decimal;
+}
+.manual ul {
+  list-style: disc;
+}
+.manual li {
+  margin: 0.25rem 0;
+}
+.manual li::marker {
+  color: var(--gold);
+}
+.manual b {
+  color: #fff;
+}
+.manual code {
+  font-family: Consolas, monospace;
+  font-size: 0.9em;
+  padding: 0.1em 0.4em;
+  border-radius: 0.35em;
+  background: rgba(255, 255, 255, 0.1);
+}
+.manual kbd {
+  display: inline-block;
+  font-family: inherit;
+  font-size: 0.85em;
+  font-weight: 700;
+  padding: 0 0.5em;
+  border-radius: 0.35em;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-bottom-width: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.manual table {
+  width: 100%;
+  margin: 0.75rem 0;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+.manual th,
+.manual td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+.manual th {
+  font-size: 0.8em;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+}
+.manual td:first-child {
+  white-space: nowrap;
+  font-weight: 700;
+  color: #fff;
+}
+.manual-tip {
+  padding: 0.6rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--gold-soft);
+  border: 1px solid var(--gold-line);
+  font-size: 0.95em;
+}
+.manual-toc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 1rem;
+}
+.manual-toc a {
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+  transition: background-color 0.15s;
+}
+.manual-toc a:hover,
+.manual-toc a.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* 版面：內容 + 右側固定大綱（寬螢幕） */
+.manual-layout {
+  max-width: 72rem;
+  margin: 0 auto;
+}
+.manual-side {
+  display: none;
+}
+@media (min-width: 1024px) {
+  .manual-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 14rem;
+    gap: 3rem;
+    align-items: start;
+  }
+  .manual-toc {
+    display: none;
+  }
+  .manual-side {
+    display: block;
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
+    padding-top: 4.5rem;
+  }
+}
+.manual-outline {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--line);
+  font-size: 0.875rem;
+}
+.manual-outline-title {
+  padding: 0 0 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+.manual-outline a {
+  position: relative;
+  padding: 0.3rem 0 0.3rem 1rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 0.15s;
+}
+.manual-outline a.sub {
+  padding-left: 1.9rem;
+  font-size: 0.8125rem;
+}
+.manual-outline a:hover {
+  color: #fff;
+}
+.manual-outline a.within {
+  color: #fff;
+}
+.manual-outline a.active {
+  color: var(--gold);
+  font-weight: 700;
+}
+.manual-outline a.active::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--gold);
+}
+.manual-shot {
+  margin: 1.5rem 0 2.5rem;
+  scroll-margin-top: 1rem;
+}
+.manual-shot figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.manual-shot figcaption b {
+  font-size: 1.15rem;
+}
+.manual-shot-no {
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  font-weight: 900;
+  font-size: 0.85rem;
+  color: #3b2a00;
+  background: var(--gold);
+}
+.manual-shot img {
+  display: block;
+  width: 100%;
+  max-width: 1024px;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
+}

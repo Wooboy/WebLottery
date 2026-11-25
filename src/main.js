@@ -20,9 +20,44 @@ import { STAGES, DEFAULT_STAGE, stageOf, normalizeStageKey } from './stages/inde
 
 const STORAGE_KEY = 'lottery_app_v2026_data'
 
+// 使用手冊：各抽獎動畫截圖（1024×768，由 scripts/capture-manual.mjs 產生）與說明
+const MANUAL_SHOTS = import.meta.glob('./assets/manual/*.webp', { eager: true, import: 'default' })
+const MANUAL_STAGE_NOTES = {
+  classic:
+    '名字老虎機。第一下開始轉動，第二下停在中獎者名字上。連續單抽為一台老虎機、每局抽一位；一次抽完時剩餘名額有幾位就排出幾台，按一下由左到右輪流停下。',
+  slot: '員編轉輪，轉輪數 = 員編長度。第一下轉動，第二下由左到右逐碼停下（每停一碼顯示還有幾人符合），全部停下才帶出人名。一次抽完時自動連續轉到抽滿。',
+  wheel:
+    '第一下轉動，第二下減速停止。盤面放上所有可抽人員（每人一格、大小相同）；人數多時字體縮小，多到看不清時只顯示色塊，中獎者另以大字揭曉。一次抽完時自動連續轉到抽滿。',
+  pile: '蓋牌洗牌後分成 3～5 堆，由來賓點選牌堆（或按數字鍵、空白鍵隨機）留下一堆，重複分堆直到剩少量牌，再一張張攤開挑選。約 3 輪選出，每局抽一位。',
+  elimination:
+    '適合一次抽多人。第一下列出所有可抽人員，之後每按一下淘汰一批，上方顯示每輪目標人數，剩「名額 + 2」人時再按一下揭曉。輪數可在獎項設定 1～6 輪（含揭曉）。',
+  lights:
+    '所有人員以暗色排列，「剩餘名額」盞亮燈在名字間隨機跳動；按下後亮燈減速停在中獎者名字上。一次抽完按一下全部停下，連續單抽每按一下停下一盞燈。',
+  flip: '第一下把所有可抽人員各發成一張蓋著的牌（安全亂數洗牌），由來賓 / 主持人點選卡牌翻開，或按空白鍵隨機翻一張；一次抽完時一次翻開全部名額。人多時卡牌自動縮小。',
+  countdown: '按一下即倒數 3、2、1，名字逐字出現；多人時依序跳出。',
+  gacha: '按一下扭蛋機搖晃、掉出扭蛋並打開揭曉。一次抽完時自動連續扭到抽滿。',
+}
+const MANUAL_TOC = [
+  { id: 'm-start', label: '快速開始' },
+  { id: 'm-people', label: '參與人員名單' },
+  { id: 'm-prizes', label: '獎項設定' },
+  { id: 'm-system', label: '系統設定' },
+  { id: 'm-file', label: '設定檔匯出 / 匯入' },
+  { id: 'm-draw', label: '抽獎畫面操作' },
+  { id: 'm-stages', label: '抽獎動畫一覽' },
+  { id: 'm-results', label: '中獎清單與匯出' },
+  { id: 'm-notes', label: '注意事項' },
+]
+const MANUAL_STAGES = STAGES.map((s) => ({
+  key: s.key,
+  label: s.label,
+  note: MANUAL_STAGE_NOTES[s.key] || '',
+  img: MANUAL_SHOTS[`./assets/manual/${s.key}.webp`] || '',
+}))
+
 createApp({
   setup() {
-    // 一般模式：settings（設定）/ results（中獎清單）；抽獎畫面只在「抽獎模式」（全螢幕）顯示
+    // 一般模式：settings（設定）/ results（中獎清單）/ manual（使用手冊）；抽獎畫面只在「抽獎模式」（全螢幕）顯示
     const currentView = ref('settings')
     const isPresenting = ref(false)
     const toast = ref('')
@@ -287,10 +322,23 @@ createApp({
 
     // 建立提供給抽獎舞台的抽獎引擎（正式抽獎與設定頁預覽共用）：
     // 中獎者一律由 decide() 以安全亂數從「當下可用名單」抽出，動畫只負責呈現；
-    // 動畫結束後才以 commit() 交給 record() 記錄（中途切換獎項 / 頁面則不記錄）
-    function makeDrawEngine({ prize, pool, remaining, record, onBusy, onHint }) {
+    // 動畫結束後以 commit() 交給 record() 記錄。
+    // quiet() 為 true 時（正式抽獎但已離開抽獎畫面）照常記錄，但不播音效、彩帶與提示
+    function makeDrawEngine({
+      prize,
+      pool,
+      remaining,
+      record,
+      onBusy,
+      onHint,
+      quiet = () => false,
+    }) {
+      const quietSfx = new Proxy(sfx, {
+        get: (t, k) =>
+          typeof t[k] === 'function' ? (...a) => (quiet() ? undefined : t[k](...a)) : t[k],
+      })
       const engine = markRaw({
-        sfx,
+        sfx: quietSfx,
         remaining,
         poolSize: () => pool().length,
         // 本回合要抽的人數：一次抽完 = 剩餘名額；連續單抽 = 1
@@ -313,7 +361,7 @@ createApp({
         decide: (n) => sample(pool(), n),
         commit(people, { big = false } = {}) {
           record(people)
-          if (!people.length) return
+          if (!people.length || quiet()) return
           if (state.config.effects !== false) confetti({ big })
           big ? sfx.bigWin() : sfx.win()
           if (engine.remaining() > 0 && engine.poolSize() === 0) {
@@ -351,6 +399,7 @@ createApp({
         },
         onBusy: (b) => (stageBusy[key] = b),
         onHint: (t) => (stageHints[key] = t),
+        quiet: () => !isPresenting.value,
       })
       stageCtxCache.set(key, engine)
       return engine
@@ -524,15 +573,10 @@ createApp({
       if (!isFullscreen.value && isPresenting.value) isPresenting.value = false
     }
     // 離開抽獎模式時抽獎畫面只是隱藏（各獎項的結果畫面保留，重新進入仍在）；
-    // 若正在進行中的回合，重建該獎項的舞台以中止動畫，未完成的回合不記錄
+    // 抽到一半離開時不中止回合：舞台保留原狀（例如已發好的牌、淘汰到一半），重新進入可接續；
+    // 離開時仍在播放的動畫會在背景播完並照常記錄（中獎者在按鍵當下已決定，不能藉離開重抽），只是不播音效與彩帶
     watch(isPresenting, (on) => {
       if (!on && dialog.open) closeDialog(false)
-      if (!on && isBusy.value && activePrize.value) {
-        const key = stageKey.value
-        const id = activePrize.value.id
-        delete stageBusy[key]
-        prizeEpoch[id] = (prizeEpoch[id] || 0) + 1
-      }
       toast.value = ''
       clearConfetti()
     })
@@ -552,8 +596,55 @@ createApp({
       state.currentIndex = (state.currentIndex + 1) % state.prizes.length
     }
 
+    // --- 使用手冊：大綱捲動高亮 / 點擊定位 ---
+    const manualScrollEl = ref(null)
+    const manualActive = ref(MANUAL_TOC[0].id) // 目前章節（含「抽獎動畫一覽」下的各動畫）
+    // 依文件順序排列的所有定位點
+    const MANUAL_ANCHORS = MANUAL_TOC.flatMap((t) =>
+      t.id === 'm-stages' ? [t.id, ...MANUAL_STAGES.map((s) => 'm-stage-' + s.key)] : [t.id],
+    )
+    // 目前所在的大章節（動畫子項目歸屬「抽獎動畫一覽」）
+    const manualSection = computed(() =>
+      manualActive.value.startsWith('m-stage-') ? 'm-stages' : manualActive.value,
+    )
+    let manualLockTimer = null
+    let manualLocked = false
+    function lockManualSpy() {
+      manualLocked = true
+      clearTimeout(manualLockTimer)
+      manualLockTimer = setTimeout(() => (manualLocked = false), 150)
+    }
+    function onManualScroll() {
+      // 點擊大綱後的平滑捲動期間不重算，避免高亮在中間章節間跳動
+      if (manualLocked) return lockManualSpy()
+      const el = manualScrollEl.value
+      if (!el) return
+      // 捲到底時最後幾個章節可能無法到頂，直接視為最後一章
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 4) {
+        manualActive.value = MANUAL_ANCHORS[MANUAL_ANCHORS.length - 1]
+        return
+      }
+      const line = el.getBoundingClientRect().top + 96
+      let current = MANUAL_ANCHORS[0]
+      for (const id of MANUAL_ANCHORS) {
+        const t = document.getElementById(id)
+        if (t && t.getBoundingClientRect().top <= line) current = id
+      }
+      manualActive.value = current
+    }
+    function goManual(id) {
+      const t = document.getElementById(id)
+      if (!t) return
+      manualActive.value = id
+      lockManualSpy()
+      t.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    watch(currentView, (v) => {
+      if (v === 'manual') manualActive.value = MANUAL_ANCHORS[0]
+    })
+
     // --- 設定檔匯出 / 匯入：在個人電腦設定好，再帶到會場電腦 ---
-    // 只包含參與名單、獎項與系統設定，不含中獎紀錄
+    // 包含參與名單、獎項、系統設定與中獎紀錄（抽到一半需要換電腦時可接續抽）
     const SETTINGS_FILE_TYPE = 'web-lottery-settings'
 
     function download(content, filename, type) {
@@ -571,13 +662,30 @@ createApp({
       const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`
       const data = {
         type: SETTINGS_FILE_TYPE,
-        version: 1,
+        version: 2,
         exportedAt: d.toISOString(),
         rawParticipants: state.rawParticipants,
         prizes: state.prizes,
         config: state.config,
+        results: state.results,
       }
       download(JSON.stringify(data, null, 2), `抽獎設定_${stamp}.json`, 'application/json')
+    }
+
+    // 匯入的中獎紀錄：只保留格式正確、且屬於匯入獎項的紀錄
+    function normalizeResults(list, prizes) {
+      if (!Array.isArray(list)) return []
+      const byId = new Map(prizes.map((p) => [p.id, p]))
+      return list
+        .filter((r) => r && byId.has(r.prizeId) && r.winnerId != null && String(r.winnerId) !== '')
+        .map((r) => ({
+          id: r.id ?? Date.now() + Math.random(),
+          prizeId: r.prizeId,
+          prizeName: String(r.prizeName ?? byId.get(r.prizeId).name),
+          winnerId: String(r.winnerId),
+          winner: String(r.winner ?? ''),
+          seed: r.seed ?? '',
+        }))
     }
 
     function importSettings(e) {
@@ -596,23 +704,26 @@ createApp({
           return alert('匯入失敗：這不是本抽獎系統匯出的設定檔')
         }
         const people = parseParticipants(String(data.rawParticipants || '')).people.length
+        const prizes = normalizePrizes(
+          data.prizes.map((p) => ({ ...p, count: parseInt(p?.count) || 1 })),
+        )
+        const results = normalizeResults(data.results, prizes)
         const msg = [
           `即將匯入設定檔「${file.name}」：`,
           `・參與人員 ${people} 人`,
-          `・獎項 ${data.prizes.length} 個`,
+          `・獎項 ${prizes.length} 個`,
+          `・中獎紀錄 ${results.length} 筆`,
           '',
-          '目前的名單、獎項與系統設定將被覆蓋。',
+          '目前的名單、獎項、系統設定與中獎紀錄將被覆蓋。',
         ]
         if (state.results.length) {
-          msg.push(`⚠️ 目前有 ${state.results.length} 筆中獎紀錄，匯入後將一併清空！`)
+          msg.push(`⚠️ 目前有 ${state.results.length} 筆中獎紀錄，匯入後將被取代！`)
         }
         if (!confirm(msg.join('\n'))) return
         state.rawParticipants = String(data.rawParticipants || '')
-        state.prizes = normalizePrizes(
-          data.prizes.map((p) => ({ ...p, count: parseInt(p?.count) || 1 })),
-        )
+        state.prizes = prizes
         state.config = { ...defaultState.config, ...(data.config || {}) }
-        state.results = []
+        state.results = results
         state.currentIndex = 0
         stageEpoch.value++
         alert('匯入設定成功！')
@@ -726,7 +837,15 @@ createApp({
       tabs: [
         { id: 'settings', name: '設定', icon: 'bx-cog' },
         { id: 'results', name: '中獎清單', icon: 'bx-trophy' },
+        { id: 'manual', name: '使用手冊', icon: 'bx-book-open' },
       ],
+      manualStages: MANUAL_STAGES,
+      manualToc: MANUAL_TOC,
+      manualScrollEl,
+      manualActive,
+      manualSection,
+      onManualScroll,
+      goManual,
       themeClasses,
       themeVars,
       hintParts,

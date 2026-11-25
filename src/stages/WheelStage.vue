@@ -1,15 +1,16 @@
 <script setup>
 // 幸運轉盤：第一下開始轉動，第二下抽出中獎者，轉盤減速停在中獎者格子
-// 轉盤最多顯示 12 格（從可抽名單隨機取），中獎者一定在盤面上
+// 盤面放上所有可抽人員（打亂順序、每人一格、格子大小相同），人多時字體縮小，太多時只顯示色塊
 // 一次抽完：第一位手動停止，之後自動連續轉動直到抽滿
 import { ref, computed, watch, watchEffect, onMounted } from 'vue'
 import { useStageKit, stageProps, easeOutQuad } from './kit.js'
-import { sample } from '../lib/random.js'
+import { shuffle } from '../lib/random.js'
 
 const props = defineProps(stageProps)
 const kit = useStageKit()
 
-const MAX_SECTORS = 12
+const LABEL_R = 93 // 名字從外緣往內排
+const MIN_FONT = 2.6 // 字體小於此值時不顯示名字（看不清楚）
 const SPEED = 600 // 度 / 秒
 // 扇區顏色：主題色深淺交錯，中獎扇區為金色（CSS 變數由外層主題提供）
 const sectorFill = (k) =>
@@ -20,12 +21,23 @@ const sectors = ref([])
 const rot = ref(0)
 const highlight = ref(-1)
 const result = ref(null) // { id, name }
+// 轉盤轉動中（含減速、連抽的下一輪）：不顯示任何中獎者，停下後才揭曉
+const turning = ref(false)
 let stopLoop = null
 
 const angle = computed(() => 360 / Math.max(1, sectors.value.length))
-const fontSize = computed(() =>
-  sectors.value.length <= 6 ? 13 : sectors.value.length <= 9 ? 11 : 9,
-)
+// 字體依外緣格寬縮放，上限 13
+const fontSize = computed(() => {
+  const S = sectors.value.length
+  if (S <= 1) return 13
+  return Math.min(13, ((2 * Math.PI * (LABEL_R - 8)) / S) * 0.8)
+})
+const showLabels = computed(() => fontSize.value >= MIN_FONT)
+// 格線寬度：格子多時變細，避免整片變白
+const strokeWidth = computed(() => {
+  const S = sectors.value.length
+  return S > 150 ? 0 : S > 60 ? 0.2 : 0.6
+})
 const isAll = computed(() => props.prize.mode === 'all' && props.prize.count > 1)
 const shownResult = computed(() => result.value || props.winners[props.winners.length - 1] || null)
 
@@ -40,7 +52,7 @@ watchEffect(() => {
 })
 
 function refill() {
-  sectors.value = sample(props.pool, MAX_SECTORS)
+  sectors.value = shuffle(props.pool)
   highlight.value = -1
 }
 onMounted(refill)
@@ -65,17 +77,24 @@ function label(name) {
 }
 
 let lastSector = -1
+let lastTick = 0
 function tickIfCrossed() {
   const s = Math.floor(rot.value / angle.value)
   if (s !== lastSector) {
     lastSector = s
-    props.ctx.sfx.tick()
+    // 格子很多時轉一圈會跨過上百格，音效限制最多每 45ms 一次
+    const now = performance.now()
+    if (now - lastTick >= 45) {
+      lastTick = now
+      props.ctx.sfx.tick()
+    }
   }
 }
 
 function spin() {
   refill()
-  result.value = ''
+  result.value = null
+  turning.value = true
   stopLoop = kit.loop((dt) => {
     rot.value += SPEED * dt
     tickIfCrossed()
@@ -86,15 +105,9 @@ async function land() {
   const { ctx } = props
   stopLoop?.()
   const [winner] = ctx.decide(1)
-  const S = sectors.value.length
   const a = angle.value
-  let k = sectors.value.findIndex((s) => s.id === winner.id)
-  if (k < 0) {
-    // 中獎者不在盤面上：替換一個遠離指針的格子（轉盤高速轉動中，觀眾看不出來）
-    const under = Math.floor((((-rot.value % 360) + 360) % 360) / a)
-    k = (under + Math.floor(S / 2)) % S
-    sectors.value[k] = winner
-  }
+  // 盤面就是完整的可抽名單，中獎者一定在盤面上
+  const k = sectors.value.findIndex((s) => s.id === winner.id)
   const jitter = (Math.random() - 0.5) * 0.6 * a
   const base = -(k + 0.5) * a - jitter
   const r0 = rot.value
@@ -106,6 +119,7 @@ async function land() {
   })
   highlight.value = k
   result.value = winner
+  turning.value = false
   ctx.commit([winner], { big: props.prize.count === 1 })
 }
 
@@ -153,23 +167,27 @@ defineExpose({ press })
               :style="{ fill: sectorFill(k) }"
               :opacity="highlight < 0 || highlight === k ? 1 : 0.45"
               stroke="rgba(255,255,255,0.35)"
-              stroke-width="0.6"
+              :stroke-width="strokeWidth"
             />
           </template>
           <circle v-else r="96" :style="{ fill: sectorFill(0) }" />
-          <g v-for="(s, k) in sectors" :key="'t' + k" :transform="`rotate(${(k + 0.5) * angle})`">
+          <g
+            v-for="(s, k) in showLabels ? sectors : []"
+            :key="'t' + k"
+            :transform="`rotate(${(k + 0.5) * angle})`"
+          >
             <text
               x="0"
-              y="-58"
-              :transform="sectors.length > 1 ? 'rotate(-90 0 -58)' : ''"
-              text-anchor="middle"
+              :y="sectors.length > 1 ? -LABEL_R : -58"
+              :transform="sectors.length > 1 ? `rotate(-90 0 ${-LABEL_R})` : ''"
+              :text-anchor="sectors.length > 1 ? 'end' : 'middle'"
               dominant-baseline="middle"
               :font-size="fontSize"
               font-weight="900"
               :fill="highlight === k ? '#3b2a00' : '#fff'"
               style="paint-order: stroke"
               stroke="rgba(0,0,0,0.35)"
-              stroke-width="1.5"
+              :stroke-width="fontSize / 8"
             >
               {{ label(s.name) }}
             </text>
@@ -184,25 +202,31 @@ defineExpose({ press })
           stroke-width="1.5"
         />
       </svg>
+      <div v-if="sectors.length > 1" class="wheel-count">盤面共 {{ sectors.length }} 人</div>
     </div>
     <div class="text-center min-w-[30%]">
-      <div
-        v-if="shownResult && phase !== 'spinning'"
-        :key="shownResult.id"
-        class="result-card pop-in"
-      >
+      <div v-if="shownResult && !turning" :key="shownResult.id" class="result-card pop-in">
         <div class="result-lbl">恭喜中獎</div>
         <div class="result-name">{{ shownResult.name }}</div>
         <div v-if="shownResult.id" class="result-id">{{ shownResult.id }}</div>
       </div>
       <div v-else class="text-4xl opacity-10 font-black tracking-[1rem]">
-        {{ phase === 'spinning' ? '…' : 'READY' }}
+        {{ turning ? '…' : 'READY' }}
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.wheel-count {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2.2em;
+  text-align: center;
+  font-size: clamp(12px, 1.2cqw, 18px);
+  color: var(--muted);
+}
 .result-card {
   display: inline-block;
   text-align: left;
