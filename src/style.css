@@ -300,6 +300,22 @@ html {
   transform: translate(-50%, -16px);
 }
 
+/* Boxicons 圖示：與文字同高、跟隨文字顏色 */
+.bx-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  flex-shrink: 0;
+}
+.bx-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
 /* 設定頁表單欄位：明顯的框線與底色，滑過 / 聚焦時強調 */
 .field {
   background: rgba(0, 0, 0, 0.3);

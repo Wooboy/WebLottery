@@ -41,7 +41,9 @@
           v-if="!isPresenting"
           class="relative z-20 shrink-0 flex flex-wrap items-center gap-3 px-6 py-4 border-b border-white/10 bg-black/20 backdrop-blur"
         >
-          <div class="font-black text-lg tracking-wide mr-2">🎉 抽獎系統</div>
+          <div class="font-black text-lg tracking-wide mr-2">
+            <bx-icon name="bx-gift" class="mr-2 text-yellow-300"></bx-icon>抽獎系統
+          </div>
           <nav class="flex gap-2">
             <button
               v-for="tab in tabs"
@@ -50,7 +52,7 @@
               :class="['px-5 py-2 rounded-full font-bold text-sm transition',
                 currentView === tab.id ? 'bg-white text-black' : 'text-white/60 hover:text-white hover:bg-white/10']"
             >
-              {{ tab.name }}
+              <bx-icon :name="tab.icon" class="mr-1.5"></bx-icon>{{ tab.name }}
               <span
                 v-if="tab.id === 'results' && state.results.length"
                 class="ml-1 text-xs opacity-60"
@@ -64,19 +66,9 @@
               title="在新分頁開啟 GitHub 原始碼"
               class="inline-flex items-center gap-1.5 px-5 py-2 rounded-full font-bold text-sm transition text-white/60 hover:text-white hover:bg-white/10"
             >
-              <svg
-                viewBox="0 0 16 16"
-                width="16"
-                height="16"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
-                />
-              </svg>
+              <bx-icon name="bxl-github"></bx-icon>
               原始碼
-              <span class="text-xs opacity-60" aria-hidden="true">↗</span>
+              <bx-icon name="bx-link-external" class="text-[10px] opacity-60"></bx-icon>
             </a>
           </nav>
           <button
@@ -84,7 +76,7 @@
             title="進入全螢幕抽獎"
             class="ml-auto px-6 py-2.5 rounded-full font-black bg-yellow-400 text-black hover:bg-yellow-300 shadow-lg transition"
           >
-            ▶ 開始抽獎（全螢幕）
+            <bx-icon name="bx-play" class="mr-2"></bx-icon>開始抽獎（全螢幕）
           </button>
         </header>
 
@@ -101,14 +93,17 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div class="glass-panel p-6 rounded-[2.5rem]">
                 <h3 class="font-bold mb-2 flex justify-between items-center gap-3">
-                  <span>👥 參與人員名單 (共 {{ participantsAll.length }} 位)</span>
+                  <span
+                    ><bx-icon name="bx-group" class="mr-2 opacity-80"></bx-icon>參與人員名單 (共 {{
+                    participantsAll.length }} 位)</span
+                  >
                   <button
                     @click="shuffleParticipants"
                     :disabled="isListLocked || participantsAll.length < 2"
                     :title="isListLocked ? '已開始抽獎，名單已鎖定' : '以安全亂數打亂名單順序'"
                     class="shrink-0 text-xs font-bold px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/30 transition disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    🔀 打亂順序
+                    <bx-icon name="bx-shuffle" class="mr-1.5"></bx-icon>打亂順序
                   </button>
                 </h3>
                 <p class="text-[11px] opacity-50 mb-3">
@@ -160,14 +155,20 @@
                   v-if="isListLocked"
                   class="mt-3 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-xl px-3 py-2"
                 >
-                  🔒 已開始抽獎，名單已鎖定。如需修改名單或打亂順序，請先按「🧹 清空中獎名單」。
+                  <bx-icon name="bx-lock-alt" class="mr-1.5"></bx-icon
+                  >已開始抽獎，名單已鎖定。如需修改名單或打亂順序，請先按「<bx-icon
+                    name="bx-eraser"
+                    class="mx-1"
+                  ></bx-icon
+                  >清空中獎名單」。
                 </p>
                 <div
                   v-if="participantErrors.length"
                   class="mt-3 text-xs text-red-200 bg-red-500/10 border border-red-400/30 rounded-xl px-3 py-2 max-h-32 overflow-y-auto"
                 >
                   <div class="font-bold mb-1">
-                    ⚠️ 名單有 {{ participantErrors.length }} 處錯誤（修正前無法開始抽獎）：
+                    <bx-icon name="bx-error" class="mr-1.5"></bx-icon>名單有 {{
+                    participantErrors.length }} 處錯誤（修正前無法開始抽獎）：
                   </div>
                   <div
                     v-for="err in participantErrors.slice(0, 20)"
@@ -186,7 +187,9 @@
 
               <div class="glass-panel p-6 rounded-[2.5rem] space-y-6">
                 <div>
-                  <h3 class="font-bold mb-4">🎨 介面色系主題</h3>
+                  <h3 class="font-bold mb-4">
+                    <bx-icon name="bx-palette" class="mr-2 opacity-80"></bx-icon>介面色系主題
+                  </h3>
                   <div class="flex gap-4">
                     <button
                       v-for="(val, key) in themeClasses"
@@ -199,7 +202,9 @@
                   </div>
                 </div>
                 <div>
-                  <h3 class="font-bold mb-3">🔊 現場效果</h3>
+                  <h3 class="font-bold mb-3">
+                    <bx-icon name="bx-volume-full" class="mr-2 opacity-80"></bx-icon>現場效果
+                  </h3>
                   <div class="flex flex-wrap gap-6 text-sm">
                     <label class="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" v-model="state.config.sound" /> 音效
@@ -209,24 +214,31 @@
                     </label>
                   </div>
                   <p class="text-[11px] mt-3 opacity-50 leading-relaxed">
-                    ⌨️ 按右上角「▶ 開始抽獎（全螢幕）」進入抽獎畫面；抽獎中 [空白鍵] / [Enter]
-                    抽獎、[PageUp] / [PageDown] 切換獎項、[Esc] 或右上角 ✕ 離開（簡報筆可直接使用）
+                    <bx-icon name="bxs-keyboard" class="mr-1.5"></bx-icon>按右上角「<bx-icon
+                      name="bx-play"
+                      class="mx-1"
+                    ></bx-icon
+                    >開始抽獎（全螢幕）」進入抽獎畫面；抽獎中 [空白鍵] / [Enter] 抽獎、[PageUp] /
+                    [PageDown] 切換獎項、[Esc] 或右上角
+                    <bx-icon name="bx-x" class="mx-0.5"></bx-icon> 離開（簡報筆可直接使用）
                   </p>
                 </div>
                 <div>
-                  <h3 class="font-bold mb-2">💾 設定檔匯出 / 匯入</h3>
+                  <h3 class="font-bold mb-2">
+                    <bx-icon name="bx-save" class="mr-2 opacity-80"></bx-icon>設定檔匯出 / 匯入
+                  </h3>
                   <div class="bg-white/5 p-4 rounded-xl border border-white/10">
                     <div class="grid grid-cols-2 gap-3">
                       <button
                         @click="exportSettings"
                         class="py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-bold transition-colors"
                       >
-                        ⬇️ 匯出設定檔
+                        <bx-icon name="bx-export" class="mr-1.5"></bx-icon>匯出設定檔
                       </button>
                       <label
                         class="py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-sm font-bold transition-colors text-center cursor-pointer"
                       >
-                        ⬆️ 匯入設定檔
+                        <bx-icon name="bx-import" class="mr-1.5"></bx-icon>匯入設定檔
                         <input
                           type="file"
                           accept=".json,application/json"
@@ -245,7 +257,7 @@
                     @click="clearResults"
                     class="w-full py-4 bg-amber-600/30 hover:bg-amber-600 rounded-2xl font-black transition-colors border border-amber-500/50"
                   >
-                    🧹 清空中獎名單
+                    <bx-icon name="bx-eraser" class="mr-2"></bx-icon>清空中獎名單
                     <span class="block text-[10px] font-normal opacity-70 mt-1"
                       >保留名單與獎項設定</span
                     >
@@ -254,7 +266,7 @@
                     @click="resetSystem"
                     class="w-full py-4 bg-red-600/40 hover:bg-red-600 rounded-2xl font-black transition-colors border border-red-500/50"
                   >
-                    🚨 全部重設
+                    <bx-icon name="bx-error" class="mr-2"></bx-icon>全部重設
                     <span class="block text-[10px] font-normal opacity-70 mt-1"
                       >名單、獎項、紀錄、設定全部刪除</span
                     >
@@ -265,12 +277,14 @@
 
             <div class="glass-panel p-6 rounded-[2.5rem] overflow-x-auto">
               <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold">🏆 獎項清單配置</h3>
+                <h3 class="text-xl font-bold">
+                  <bx-icon name="bx-trophy" class="mr-2 text-yellow-300"></bx-icon>獎項清單配置
+                </h3>
                 <button
                   @click="addPrize"
                   class="text-sm bg-white/20 px-6 py-2 rounded-full hover:bg-white/30 transition"
                 >
-                  + 新增獎項
+                  <bx-icon name="bx-plus" class="mr-1.5"></bx-icon>新增獎項
                 </button>
               </div>
               <table class="prize-table w-full text-left min-w-[1100px]">
@@ -360,7 +374,7 @@
                         title="模擬此獎項的抽獎畫面（不會記錄）"
                         class="ml-2 text-xs font-bold px-3 py-1 rounded-full bg-white/15 hover:bg-white/30 transition"
                       >
-                        👁 預覽
+                        <bx-icon name="bx-show" class="mr-1"></bx-icon>預覽
                       </button>
                     </td>
                     <td class="min-w-[10rem]">
@@ -385,7 +399,8 @@
                         v-if="toImageUrl(p.bgUrl) && bgStatus[toImageUrl(p.bgUrl)] === 'error'"
                         class="text-[10px] text-red-300 mt-1"
                       >
-                        ⚠ 圖片讀取失敗，請確認路徑或網址
+                        <bx-icon name="bx-error" class="mr-1"></bx-icon
+                        >圖片讀取失敗，請確認路徑或網址
                       </div>
                     </td>
                     <td class="text-right">
@@ -395,7 +410,7 @@
                         aria-label="刪除此獎項"
                         class="w-8 h-8 rounded-full text-red-400 hover:text-red-100 hover:bg-red-500/30 transition"
                       >
-                        ✕
+                        <bx-icon name="bx-trash"></bx-icon>
                       </button>
                     </td>
                   </tr>
@@ -431,7 +446,7 @@
                   aria-label="上一個獎項"
                   title="上一個獎項 (PageUp)"
                 >
-                  ‹
+                  <bx-icon name="bx-chevron-left"></bx-icon>
                 </button>
                 <button
                   @click="nextPrize"
@@ -439,29 +454,33 @@
                   aria-label="下一個獎項"
                   title="下一個獎項 (PageDown)"
                 >
-                  ›
+                  <bx-icon name="bx-chevron-right"></bx-icon>
                 </button>
               </div>
             </div>
 
             <!-- 抽獎舞台：依獎項設定的動畫樣式切換 -->
             <div class="lt-stage">
-              <component
-                :is="stageComponent"
-                :key="stageKey"
-                ref="stageRef"
-                :ctx="ctx"
-                :prize="activePrize"
-                :pool="availablePool"
-                :winners="currentWinnerPeople"
-              ></component>
+              <!-- KeepAlive：切換獎項時保留各獎項的舞台畫面，切回來仍停在上次結果 -->
+              <keep-alive :max="50">
+                <component
+                  :is="stageComponent"
+                  :key="stageKey"
+                  ref="stageRef"
+                  :ctx="ctx"
+                  :prize="activePrize"
+                  :pool="availablePool"
+                  :winners="currentWinnerPeople"
+                ></component>
+              </keep-alive>
             </div>
 
             <!-- 下方：已中獎名單 + 操作提示 -->
             <div class="lt-bottom">
               <div class="lt-ribbon">
                 <span class="lt-ribbon-lbl">已中獎</span>
-                <transition-group name="list" tag="div" class="lt-chips">
+                <!-- 以獎項 id 為 key：切換獎項時整排直接換掉，不播放上一個獎項名單的離場動畫 -->
+                <transition-group :key="activePrize.id" name="list" tag="div" class="lt-chips">
                   <div v-for="win in currentWinners" :key="win.id" class="lt-chip">
                     <b>{{ win.winner }}</b>
                     <span v-if="win.winnerId">{{ win.winnerId }}</span>
@@ -483,7 +502,7 @@
                 class="lt-redraw"
                 title="清除此獎項的中獎紀錄並重抽"
               >
-                ↺ 重抽
+                <bx-icon name="bx-reset" class="mr-1.5"></bx-icon>重抽
               </button>
             </div>
           </div>
@@ -503,7 +522,7 @@
           aria-label="離開抽獎"
           class="fixed top-4 right-4 z-50 w-11 h-11 rounded-full glass-panel text-lg opacity-20 hover:opacity-100 transition"
         >
-          ✕
+          <bx-icon name="bx-x"></bx-icon>
         </button>
 
         <!-- 抽獎動畫預覽（模擬，不記錄） -->
@@ -552,13 +571,13 @@
                   @click="resetPreview"
                   class="text-xs font-bold px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/30 transition"
                 >
-                  ↺ 重新模擬
+                  <bx-icon name="bx-reset" class="mr-1.5"></bx-icon>重新模擬
                 </button>
                 <button
                   @click="closePreview"
                   class="text-xs font-bold px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/30 transition"
                 >
-                  ✕ 關閉 (Esc)
+                  <bx-icon name="bx-x" class="mr-1.5"></bx-icon>關閉 (Esc)
                 </button>
               </div>
             </div>
@@ -608,7 +627,7 @@
                   @click="previewPress"
                   class="px-6 py-2 rounded-full font-black bg-yellow-400 text-black hover:bg-yellow-300 transition"
                 >
-                  ▶ 模擬按下空白鍵
+                  <bx-icon name="bx-play" class="mr-1.5"></bx-icon>模擬按下空白鍵
                 </button>
               </div>
             </div>
@@ -637,7 +656,7 @@
                 @click="exportCSV"
                 class="bg-emerald-600 hover:bg-emerald-700 px-8 py-3 rounded-2xl font-bold shadow-lg transition"
               >
-                匯出 CSV 名單
+                <bx-icon name="bx-download" class="mr-2"></bx-icon>匯出 CSV 名單
               </button>
             </div>
             <div class="glass-panel rounded-[2.5rem] overflow-hidden">
