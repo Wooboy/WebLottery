@@ -267,11 +267,15 @@ createApp({
     const stageCtxCache = new Map()
     const hint = computed(() => {
       const p = activePrize.value
-      // 名額已抽滿：提示切換到下一個獎項（各動畫的提示只管抽獎操作）
-      if (p && !stageBusy[stageKey.value] && remainingCount(p.id) <= 0) {
-        return '本獎項已抽完｜按 [PageDown] 切換下一個獎項'
-      }
+      // 名額已抽滿：改顯示「下一個獎項」按鈕（各動畫的提示只管抽獎操作）。
+      // 按鈕不顯示下一個獎項的名稱，也不因是否為最後一個獎項而改變，
+      // 避免台下從畫面察覺還有沒有加碼獎項。
+      if (prizeDone.value) return '本獎項已抽完'
       return stageHints[stageKey.value] || ''
+    })
+    const prizeDone = computed(() => {
+      const p = activePrize.value
+      return !!p && !stageBusy[stageKey.value] && remainingCount(p.id) <= 0
     })
     const isBusy = computed(() => !!stageBusy[stageKey.value]) // 回合進行中（鎖定切換獎項）
 
@@ -702,6 +706,7 @@ createApp({
       stageOf,
       state,
       isBusy,
+      prizeDone,
       isFullscreen,
       hint,
       toast,

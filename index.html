@@ -498,6 +498,14 @@
                 </template>
               </div>
               <button
+                v-if="prizeDone && state.prizes.length > 1"
+                @click="nextPrize"
+                class="lt-next"
+              >
+                下一個獎項
+                <bx-icon name="bx-chevron-right" class="ml-1"></bx-icon>
+              </button>
+              <button
                 v-if="!isBusy && currentWinners.length > 0"
                 @click="confirmRedraw"
                 class="lt-redraw"
