@@ -6,6 +6,7 @@ import FlipStage from './FlipStage.vue'
 import CountdownStage from './CountdownStage.vue'
 import GachaStage from './GachaStage.vue'
 import EliminationStage from './EliminationStage.vue'
+import LightsStage from './LightsStage.vue'
 
 // 抽獎動畫樣式（key 存於獎項設定 prize.style）
 export const STAGES = [
@@ -14,6 +15,7 @@ export const STAGES = [
   { key: 'wheel', label: '幸運轉盤', component: WheelStage },
   { key: 'pile', label: '選堆', component: PileStage },
   { key: 'elimination', label: '淘汰制', component: EliminationStage },
+  { key: 'lights', label: '跑燈', component: LightsStage },
   { key: 'flip', label: '翻牌', component: FlipStage },
   { key: 'countdown', label: '倒數揭曉', component: CountdownStage },
   { key: 'gacha', label: '扭蛋機', component: GachaStage },
