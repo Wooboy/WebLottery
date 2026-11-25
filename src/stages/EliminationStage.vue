@@ -235,7 +235,6 @@ defineExpose({ press })
 .cell.out {
   opacity: 0.12;
   transform: scale(0.85);
-  text-decoration: line-through;
   filter: grayscale(1);
 }
 .cell.win {
@@ -251,7 +250,6 @@ defineExpose({ press })
   font-weight: 600;
   font-size: 0.5em;
   opacity: 0.75;
-  text-decoration: none;
 }
 .cell-xl {
   font-size: clamp(22px, 3.6cqw, 64px);

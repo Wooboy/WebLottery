@@ -443,6 +443,12 @@ createApp({
     }
 
     function handleKeydown(e) {
+      // 確認視窗開啟時：Esc 取消，其餘按鍵只作用在視窗按鈕上（不觸發抽獎 / 切換獎項）
+      if (dialog.open) {
+        if (e.code === 'Escape') closeDialog(false)
+        else if (!['Enter', 'NumpadEnter', 'Space', 'Tab'].includes(e.code)) e.preventDefault()
+        return
+      }
       if (isTyping(e.target)) return
       if (e.ctrlKey || e.altKey || e.metaKey) return
 
@@ -487,6 +493,7 @@ createApp({
     }
 
     function handleKeyup(e) {
+      if (dialog.open) return
       if (ACTION_KEYS.includes(e.code) && !isTyping(e.target)) e.preventDefault()
     }
 
@@ -519,6 +526,7 @@ createApp({
     // 離開抽獎模式時抽獎畫面只是隱藏（各獎項的結果畫面保留，重新進入仍在）；
     // 若正在進行中的回合，重建該獎項的舞台以中止動畫，未完成的回合不記錄
     watch(isPresenting, (on) => {
+      if (!on && dialog.open) closeDialog(false)
       if (!on && isBusy.value && activePrize.value) {
         const key = stageKey.value
         const id = activePrize.value.id
@@ -612,12 +620,33 @@ createApp({
       reader.readAsText(file)
     }
 
-    function confirmRedraw() {
-      if (confirm('警告：這將清除此獎項目前的「所有」中獎紀錄並讓名額回流，確定嗎？')) {
-        const id = activePrize.value.id
-        state.results = state.results.filter((r) => r.prizeId !== id)
-        prizeEpoch[id] = (prizeEpoch[id] || 0) + 1
-      }
+    // 頁面內確認視窗：瀏覽器原生 confirm() 會讓全螢幕跳出，抽獎畫面改用這個
+    const dialog = reactive({ open: false, title: '', message: '', okText: '確定', resolve: null })
+    const dialogCancelEl = ref(null)
+    function askConfirm({ title, message, okText = '確定' }) {
+      dialog.resolve?.(false)
+      Object.assign(dialog, { open: true, title, message, okText })
+      // 預設焦點放在「取消」，避免誤按空白鍵 / Enter 直接確認
+      nextTick(() => dialogCancelEl.value?.focus())
+      return new Promise((resolve) => (dialog.resolve = resolve))
+    }
+    function closeDialog(ok) {
+      const resolve = dialog.resolve
+      Object.assign(dialog, { open: false, resolve: null })
+      resolve?.(ok)
+    }
+
+    async function confirmRedraw() {
+      const p = activePrize.value
+      if (!p) return
+      const ok = await askConfirm({
+        title: '清除此獎項並重抽？',
+        message: `將清除「${p.name}」目前的所有中獎紀錄，名額回流後可重新抽獎。`,
+        okText: '清除並重抽',
+      })
+      if (!ok) return
+      state.results = state.results.filter((r) => r.prizeId !== p.id)
+      prizeEpoch[p.id] = (prizeEpoch[p.id] || 0) + 1
     }
 
     function clearResults() {
@@ -707,6 +736,9 @@ createApp({
       state,
       isBusy,
       prizeDone,
+      dialog,
+      dialogCancelEl,
+      closeDialog,
       isFullscreen,
       hint,
       toast,
